@@ -76,18 +76,6 @@ if (status_code(response) == 200) {
   stop("Failed to download the file.")
 }
 
-# # Define base file path - change as needed
-# wd <- "C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project"
-# 
-# # Define input file path
-# input_folder <- file.path(wd, "data")
-# 
-# # Set working directory
-# setwd(wd)
-# 
-# # Import the data
-# sqf_data <- read_excel(file.path(input_folder, "sqf-2023.xlsx"))
-
  #View the first few rows of the data
 head(sqf_data)
 
