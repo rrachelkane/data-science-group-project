@@ -1,0 +1,345 @@
+---
+title: 'FDOS Group Project'
+subtitle: 'Subtitle'
+author: "Miraç Arda Balaban, Rachel Kane, Lucas Mordue, Gretchen Moulton"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df-print: paged
+    fig-width: 9
+    fig-height: 6
+    page-layout: full
+---
+
+```{r}
+# Install and load required packages
+if (!require("pacman")) install.packages("pacman")
+library(pacman)
+
+p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr)
+```
+
+# Introduction
+
+Include:
+
+* Research Question & target variable for prediction
+
+* Motivation/relevance - cite some literature
+
+* Dataset name 
+
+* Setting description 
+
+* Relevant features for prediction in the dataset
+
+* Main methods used
+
+* Key findings
+
+# Data Description
+
+The data source is the [New York Police Department Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page).
+
+* Dimension
+
+* How data is collected & what universe is/is not observed
+
+* Temporal and spatial span
+
+First, we set up file paths and import the data.
+
+```{r}
+# Define base file path - change as needed
+wd <- "C:/Users/rache/OneDrive/Documents/GitHub/bse-masters/foundations-of-data-science/Foundations of Data Science"
+
+# Define input file path
+input_folder <- file.path(wd, "input")
+
+# Set working directory
+setwd(wd)
+
+# Import the data
+sqf_data <- read_excel(file.path(input_folder, "sqf-2023.xlsx"))
+
+ #View the first few rows of the data
+head(sqf_data)
+
+# Check original dimensions
+dim(sqf_data)
+
+# View head
+head(sqf_data)
+```
+
+# Data Cleaning
+
+## Column Names
+
+First, we change column names from strictly upper case to strictly lower case, because it's cuter.
+
+```{r}
+colnames(sqf_data) <- tolower(colnames(sqf_data))
+
+# check
+colnames(sqf_data)[1:3]
+```
+
+## Missing Values 
+
+There are many observations in the data with values == `(null)` across different columns.
+
+The overall number of `(null)` values are as follows:
+
+```{r}
+# Sum (null) values by column
+apply(sqf_data, 2, function(x) sum(x == "(null)"))
+```
+
+Note, however, that not all of these `(null)` observations are equivalent:
+
+* in some columns, `(null)` means the data are **genuinely effectively `NA`**, as there are instances of both "Y" and "N" (for binary variable for example), alongside `(null)`.
+
+```{r}
+sqf_data %>% 
+  group_by(ask_for_consent_flg) %>% 
+  summarise(N = n()) %>% 
+  kable()
+```
+
+* whereas in other cases, the `null` values are, confusingly, actually used as "N".
+
+```{r}
+print(unique(sqf_data$firearm_flag))
+
+# grouped example
+sqf_data %>% 
+  group_by(weapon_found_flag, firearm_flag) %>% 
+  summarise(N = n()) %>% 
+  kable()
+```
+
+note issue here re no weapons found but firearm found for small n of cases
+
+We deal with these cases separately below:
+
+```{r}
+# columns with genuinely missing null values
+type1_variables <- c("ask_for_consent_flg", "consent_given_flg", "suspect_reported_age", "suspect_height", "suspect_weight", "suspect_arrest_offense") 
+
+# pre-clean check
+print(unique(sqf_data$ask_for_consent_flg))
+
+# replace these with NAs
+sqf_data <- sqf_data %>%
+  mutate(across(all_of(type1_variables), ~ ifelse(. == "(null)", NA, .)))
+
+# post-clean check
+print(unique(sqf_data$ask_for_consent_flg))
+
+# columns with null values meaning N
+type2_variables <- c("firearm_flag", "knife_cutter_flag", "other_weapon_flag") 
+
+# pre-clean check
+print(unique(sqf_data$firearm_flag))
+
+# replace these with NAs
+sqf_data <- sqf_data %>%
+  mutate(across(all_of(type2_variables), ~ ifelse(. == "(null)", "N", .)))
+
+# post-clean check
+print(unique(sqf_data$firearm_flag))
+```
+  
+### Errors in Weapon Found Flag
+
+For now, replace `"N"` values of `weapon_found_flag` with y if any of the weapons categories are `"Y"`
+
+```{r}
+print(sum(sqf_data$weapon_found_flag == "N"))
+
+sqf_data <- sqf_data %>% 
+  mutate(weapon_found_flag = ifelse((firearm_flag == "Y" | knife_cutter_flag == "Y" | other_weapon_flag == "Y"), "Y", weapon_found_flag))
+
+print(sum(sqf_data$weapon_found_flag == "N"))
+```
+
+  
+## Binary Variables 
+  
+can replace Ys and Ns here with 1s and 0s
+
+
+# Exploratory Data Analysis 
+
+## Frisk Status
+
+```{r}
+# frisked
+sqf_data %>% 
+  group_by(frisked_flag) %>% 
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>% 
+  arrange(desc(N)) %>% 
+  kable(booktabs = TRUE, col.names = c("Suspect Frisked", "N Stops", "% Total Stops"), align = "l")
+
+# by suspected crime
+sqf_data %>% 
+  group_by(suspected_crime_description) %>%
+  summarize(N = n(),
+            pc_frisked = round((sum(frisked_flag == "Y")/N) * 100, 2),
+            pc_not_frisked = round((sum(frisked_flag == "N")/N) * 100, 2)
+            ) %>% 
+  arrange(desc(pc_frisked)) %>% 
+  kable(booktabs = TRUE, col.names = c("Suspected Crime", "N", "% Frisked", "% Not Frisked"), align = "l")
+
+# by race
+sqf_data %>% 
+  group_by(suspect_race_description) %>%
+  summarize(N = n(),
+            pc_frisked = round((sum(frisked_flag == "Y")/N) * 100, 2),
+            pc_not_frisked = round((sum(frisked_flag == "N")/N) * 100, 2)
+            ) %>% 
+  arrange(desc(pc_frisked)) %>% 
+  kable(booktabs = TRUE, col.names = c("Suspect Race", "N", "% Frisked", "% Not Frisked"), align = "l")
+
+```
+
+## Search Status
+
+```{r}
+# searched
+sqf_data %>%
+  group_by(searched_flag) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Suspect Searched", "N Stops", "% Total Stops"), align = "l")
+```
+
+## Arrest Status
+
+```{r}
+sqf_data %>%
+  group_by(suspect_arrested_flag) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Suspect Arrested", "N Stops", "% Total Stops"), align = "l")
+
+# plot
+ggplot(data = sqf_data, aes(x = suspect_arrested_flag, fill = suspect_race_description)) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspect Arrested") +
+  ylab("Number of Observations") +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
+  labs(title = "Suspect Arrest Status by Race")
+
+# 100% stacked version
+ggplot(data = sqf_data, aes(x = suspect_arrested_flag, fill = suspect_race_description)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspect Arrested") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
+  labs(title = "Suspect Arrest Status by Race")
+
+```
+
+## Physical Force Status
+
+```{r}
+```
+
+## Other Univariate Descriptives
+
+```{r}
+sqf_data %>%
+  group_by(suspected_crime_description) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Suspected Crime", "N Stops", "% Total Stops"), align = "l")
+
+
+# # suspect sex
+sqf_data %>%
+  group_by(suspect_sex) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Suspect Sex", "N Stops", "% Total Stops"), align = "l")  
+
+# suspect race
+sqf_data %>%
+  group_by(suspect_race_description) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Suspect Race", "N Stops", "% Total Stops"), align = "l")  # small amount missing - solution?
+
+# issuing office rank
+sqf_data %>%
+  group_by(issuing_officer_rank) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Issuing Officer Rank", "N Stops", "% Total Stops"), align = "l")  
+
+
+# supervising office rank
+sqf_data %>%
+  group_by(supervising_officer_rank) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Supervising Officer Rank", "N Stops", "% Total Stops"), align = "l")
+```
+
+## Weapon Possession
+
+```{r}
+sqf_data <- sqf_data %>%
+  mutate(weapon_type = case_when(
+    firearm_flag == "Y" & knife_cutter_flag == "Y" & other_weapon_flag == "Y" ~ "Firearm, Knife Cutter, and Other Weapon",
+    firearm_flag == "Y" & knife_cutter_flag == "Y" ~ "Firearm and Knife Cutter",
+    firearm_flag == "Y" & other_weapon_flag == "Y" ~ "Firearm and Other Weapon",
+    knife_cutter_flag == "Y" & other_weapon_flag == "Y" ~ "Knife Cutter and Other Weapon",
+    firearm_flag == "Y" ~ "Firearm Only",
+    knife_cutter_flag == "Y" ~ "Knife Cutter Only",
+    other_weapon_flag == "Y" ~ "Other Weapon Only",
+    TRUE ~ "No Weapon Found"
+  ))
+
+ggplot(sqf_data, aes(x = weapon_found_flag, fill = weapon_type)) +
+  geom_bar() +
+  labs(
+    title = "Weapons Found by Type of Weapon(s)",
+    x = "Type of Weapon(s) Found",
+    y = "Number of Cases"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Weapon Type")
+```
+
+
+* basic grouped tables and plots, cumulative plots
+
+* correlation plots
+
+
+
+
+
+# Regression Analysis
+
+* state models, assumptions, evaluation criteria blah blah blah
+* run + check model diagnostics
+
+# Conclusion
