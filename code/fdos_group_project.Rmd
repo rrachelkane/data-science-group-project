@@ -54,10 +54,10 @@ First, we set up file paths and import the data.
 
 ```{r}
 # Define base file path - change as needed
-wd <- "C:/Users/rache/OneDrive/Documents/GitHub/bse-masters/foundations-of-data-science/Foundations of Data Science"
+wd <- "C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project"
 
 # Define input file path
-input_folder <- file.path(wd, "input")
+input_folder <- file.path(wd, "data")
 
 # Set working directory
 setwd(wd)
