@@ -1518,17 +1518,55 @@ observed</p></li>
 <li><p>Temporal and spatial span</p></li>
 </ul>
 <p>First, we set up file paths and import the data.</p>
-<pre class="r"><code># Define base file path - change as needed
-wd &lt;- &quot;C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project&quot;
+<pre class="r"><code># Define the raw GitHub URL for the excel file
+url &lt;- &quot;https://raw.githubusercontent.com/rrachelkane/data-science-group-project/main/data/sqf-2023.xlsx&quot;
 
-# Define input file path
-input_folder &lt;- file.path(wd, &quot;data&quot;)
+# get raw content of the file with URL
+response &lt;- GET(url)
 
-# Set working directory
-setwd(wd)
-
-# Import the data
-sqf_data &lt;- read_excel(file.path(input_folder, &quot;sqf-2023.xlsx&quot;))
+# Check if the request was successful (status code 200 means OK)
+if (status_code(response) == 200) {
+  # Create a temporary file to save the downloaded content
+  temp_file &lt;- tempfile(fileext = &quot;.xlsx&quot;)
+  
+  # Write the raw content to the temporary file
+  writeBin(content(response, &quot;raw&quot;), temp_file)
+  
+  # Read the Excel file from the temporary file
+  sqf_data &lt;- read_xlsx(temp_file)
+  
+  # View the first few rows of the data
+  head(sqf_data)
+} else {
+  stop(&quot;Failed to download the file.&quot;)
+}</code></pre>
+<pre><code>## # A tibble: 6 × 82
+##   STOP_ID STOP_FRISK_DATE STOP_FRISK_TIME YEAR2 MONTH2  DAY2  STOP_WAS_INITIATED
+##     &lt;dbl&gt; &lt;chr&gt;           &lt;chr&gt;           &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt; &lt;chr&gt;             
+## 1       1 2023-01-01      00:44:00         2023 January Sund… Based on Radio Run
+## 2       2 2023-01-01      00:49:00         2023 January Sund… Based on Self Ini…
+## 3       3 2023-01-01      05:31:00         2023 January Sund… Based on Radio Run
+## 4       4 2023-01-01      04:59:00         2023 January Sund… Based on Self Ini…
+## 5       5 2023-01-01      05:21:00         2023 January Sund… Based on Self Ini…
+## 6       6 2023-01-01      18:00:00         2023 January Sund… Based on Radio Run
+## # ℹ 75 more variables: RECORD_STATUS_CODE &lt;chr&gt;, ISSUING_OFFICER_RANK &lt;chr&gt;,
+## #   ISSUING_OFFICER_COMMAND_CODE &lt;chr&gt;, SUPERVISING_OFFICER_RANK &lt;chr&gt;,
+## #   SUPERVISING_OFFICER_COMMAND_CODE &lt;chr&gt;,
+## #   SUPERVISING_ACTION_CORRESPONDING_ACTIVITY_LOG_ENTRY_REVIEWED &lt;chr&gt;,
+## #   LOCATION_IN_OUT_CODE &lt;chr&gt;, JURISDICTION_CODE &lt;chr&gt;,
+## #   JURISDICTION_DESCRIPTION &lt;chr&gt;, OBSERVED_DURATION_MINUTES &lt;dbl&gt;,
+## #   SUSPECTED_CRIME_DESCRIPTION &lt;chr&gt;, STOP_DURATION_MINUTES &lt;dbl&gt;, …</code></pre>
+<pre class="r"><code># # Define base file path - change as needed
+# wd &lt;- &quot;C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project&quot;
+# 
+# # Define input file path
+# input_folder &lt;- file.path(wd, &quot;data&quot;)
+# 
+# # Set working directory
+# setwd(wd)
+# 
+# # Import the data
+# sqf_data &lt;- read_excel(file.path(input_folder, &quot;sqf-2023.xlsx&quot;))
 
  #View the first few rows of the data
 head(sqf_data)</code></pre>

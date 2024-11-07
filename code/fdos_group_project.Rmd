@@ -53,17 +53,40 @@ The data source is the [New York Police Department Stop, Question and Frisk Data
 First, we set up file paths and import the data.
 
 ```{r}
-# Define base file path - change as needed
-wd <- "C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project"
+# Define the raw GitHub URL for the excel file
+url <- "https://raw.githubusercontent.com/rrachelkane/data-science-group-project/main/data/sqf-2023.xlsx"
 
-# Define input file path
-input_folder <- file.path(wd, "data")
+# get raw content of the file with URL
+response <- GET(url)
 
-# Set working directory
-setwd(wd)
+# Check if the request was successful (status code 200 means OK)
+if (status_code(response) == 200) {
+  # Create a temporary file to save the downloaded content
+  temp_file <- tempfile(fileext = ".xlsx")
+  
+  # Write the raw content to the temporary file
+  writeBin(content(response, "raw"), temp_file)
+  
+  # Read the Excel file from the temporary file
+  sqf_data <- read_xlsx(temp_file)
+  
+  # View the first few rows of the data
+  head(sqf_data)
+} else {
+  stop("Failed to download the file.")
+}
 
-# Import the data
-sqf_data <- read_excel(file.path(input_folder, "sqf-2023.xlsx"))
+# # Define base file path - change as needed
+# wd <- "C:/Users/rache/OneDrive/Documents/GitHub/data-science-group-project"
+# 
+# # Define input file path
+# input_folder <- file.path(wd, "data")
+# 
+# # Set working directory
+# setwd(wd)
+# 
+# # Import the data
+# sqf_data <- read_excel(file.path(input_folder, "sqf-2023.xlsx"))
 
  #View the first few rows of the data
 head(sqf_data)
