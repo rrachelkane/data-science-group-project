@@ -1,6 +1,5 @@
 ---
-title: 'FDOS Group Project'
-subtitle: 'Subtitle'
+title: 'Final Project: X Prediction'
 author: "Miraç Arda Balaban, Rachel Kane, Lucas Mordue, Gretchen Moulton"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -22,44 +21,37 @@ library(pacman)
 p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr)
 ```
 
+# Abstract
+
+The goal of our project is to predict Y. *edit, include key findings*
+
 # Introduction
 
-Include:
+* **Target variable:**
 
-* Research Question & target variable for prediction
+* **Motivation:** *edit here re relevance, cite some literature*
 
-* Motivation/relevance - cite some literature
+* **Relevant features:** *edit*
 
-* Dataset name 
-
-* Setting description 
-
-* Relevant features for prediction in the dataset
-
-* Main methods used
-
-* Key findings
+* **Methods:** *edit*
 
 # Data Description
 
-The data source is the [New York Police Department Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page).
-
-* Dimension
+ We use the [New York Police Department Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page) from 2023.
 
 * How data is collected & what universe is/is not observed
 
-* Temporal and spatial span
+* Temporal and spatial span.
 
-First, we set up file paths and import the data.
+The data has 16971 observations and 82 features, as shown below.
+
+We begin the project by setting up file paths and importing the data.
 
 ```{r}
-# Define the raw GitHub URL for the excel file
-url <- "https://raw.githubusercontent.com/rrachelkane/data-science-group-project/main/data/sqf-2023.xlsx"
+# get raw content of the file 
+response <- GET("https://raw.githubusercontent.com/rrachelkane/data-science-group-project/main/data/sqf-2023.xlsx")
 
-# get raw content of the file with URL
-response <- GET(url)
-
-# Check if the request was successful (status code 200 means OK)
+# retrieve the .xlsx file
 if (status_code(response) == 200) {
   # Create a temporary file to save the downloaded content
   temp_file <- tempfile(fileext = ".xlsx")
@@ -75,9 +67,6 @@ if (status_code(response) == 200) {
 } else {
   stop("Failed to download the file.")
 }
-
- #View the first few rows of the data
-head(sqf_data)
 
 # Check original dimensions
 dim(sqf_data)
@@ -101,18 +90,50 @@ colnames(sqf_data)[1:3]
 
 ## Missing Values 
 
-There are many observations in the data with values == `(null)` across different columns.
-
-The overall number of `(null)` values are as follows:
+First, we note that there are only two features with any instance of an `NA` value.
 
 ```{r}
-# Sum (null) values by column
-apply(sqf_data, 2, function(x) sum(x == "(null)"))
+na_cols <- colMeans(is.na(sqf_data)) * 100 
+na_cols[na_cols > 0]
+```
+
+*edit* The process generating the missingness of `demeanor_of_person_stopped` is unclear. Imputation of this would be difficult. Secondly, `stop_location_street_name` is not required for prediction in our case as we have other spatial measures. We drop both of these features.
+
+```{r}
+# drop features
+sqf_data <- sqf_data %>% 
+  select(-c("demeanor_of_person_stopped", "stop_location_street_name"))
+
+# check new dim
+dim(sqf_data)
+```
+
+However, there are many observations in the data with values == `(null)` across different columns.
+
+```{r}
+# get % of nulls in columns with at least one null
+null_cols <- (colMeans(sqf_data == "(null)") * 100)[colMeans(sqf_data == "(null)") * 100 > 0]
+
+# make df for plot
+null_cols_df <- data.frame(Feature = names(null_cols), Percentage = null_cols)
+
+# order for plot
+null_cols_df$Feature <- factor(null_cols_df$Feature, 
+                              levels = null_cols_df$Feature[order(null_cols_df$Percentage, decreasing = FALSE)])
+
+# plot
+ggplot(null_cols_df, aes(x = Feature, y = Percentage)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "darkblue") +
+  labs(title = "Percentage of (null) Values per Feature", 
+       x = "Features", 
+       y = "Percentage of (null) Values") +
+  coord_flip() +  # Flip coordinates
+  theme_minimal()
 ```
 
 Note, however, that not all of these `(null)` observations are equivalent:
 
-* in some columns, `(null)` means the data are **genuinely effectively `NA`**, as there are instances of both "Y" and "N" (for binary variable for example), alongside `(null)`.
+* in some columns - particularly those with lower percentages of `(null)` values, `(null)` means the data are **genuinely effectively `NA`**, as there are instances of both "Y" and "N" (for binary variable for example), alongside `(null)`.
 
 ```{r}
 sqf_data %>% 
@@ -133,56 +154,52 @@ sqf_data %>%
   kable()
 ```
 
-note issue here re no weapons found but firearm found for small n of cases
+Note here that even though a `firearm_flag` has a `"Y"` entry and `weapon_found_flag` has a `"N"` entry, this is not necessarily incorrect, as the officer can have identified a firearm without having to carry out a frisk nor a 
 
-We deal with these cases separately below:
+First, we deal with these cases of `(null)` separately:
 
 ```{r}
 # columns with genuinely missing null values
-type1_variables <- c("ask_for_consent_flg", "consent_given_flg", "suspect_reported_age", "suspect_height", "suspect_weight", "suspect_arrest_offense") 
+null_1 <- c("ask_for_consent_flg", "consent_given_flg", "suspect_reported_age", "suspect_height", "suspect_weight", "suspect_arrest_offense", "suspect_eye_color", "physical_force_verbal_instruction_flag", "suspect_body_build_type", "suspect_hair_color", "suspect_race_description", "suspect_sex", "stop_location_sector_code", "stop_location_x", "stop_location_y", "suspect_reported_age") 
 
 # pre-clean check
 print(unique(sqf_data$ask_for_consent_flg))
 
 # replace these with NAs
 sqf_data <- sqf_data %>%
-  mutate(across(all_of(type1_variables), ~ ifelse(. == "(null)", NA, .)))
+  mutate(across(all_of(null_1), ~ ifelse(. == "(null)", NA, .)))
 
 # post-clean check
 print(unique(sqf_data$ask_for_consent_flg))
 
 # columns with null values meaning N
-type2_variables <- c("firearm_flag", "knife_cutter_flag", "other_weapon_flag") 
+null_2 <- c("firearm_flag", "knife_cutter_flag", "other_weapon_flag") 
 
 # pre-clean check
 print(unique(sqf_data$firearm_flag))
 
 # replace these with NAs
 sqf_data <- sqf_data %>%
-  mutate(across(all_of(type2_variables), ~ ifelse(. == "(null)", "N", .)))
+  mutate(across(all_of(null_2), ~ ifelse(. == "(null)", "N", .)))
 
 # post-clean check
 print(unique(sqf_data$firearm_flag))
 ```
   
-### Errors in Weapon Found Flag
+note some are not so clear like physical force weapon impact, id care identifies etc - like are these selectively not reported or ?
 
-For now, replace `"N"` values of `weapon_found_flag` with y if any of the weapons categories are `"Y"`
+might not matter for prediction question
+
+backround circumstances flags are important
+
+Note, following this cleaning, we now **drop observations** where the suspects race, sex or suspected crime is missing:
 
 ```{r}
-print(sum(sqf_data$weapon_found_flag == "N"))
+sqf_data <- sqf_data %>%
+  filter(if_any(c(suspect_race_description, suspected_crime_description, suspect_sex), is.na))
 
-sqf_data <- sqf_data %>% 
-  mutate(weapon_found_flag = ifelse((firearm_flag == "Y" | knife_cutter_flag == "Y" | other_weapon_flag == "Y"), "Y", weapon_found_flag))
-
-print(sum(sqf_data$weapon_found_flag == "N"))
+dim(sqf_data)
 ```
-
-  
-## Binary Variables 
-  
-can replace Ys and Ns here with 1s and 0s
-
 
 # Exploratory Data Analysis 
 
@@ -197,25 +214,28 @@ sqf_data %>%
   arrange(desc(N)) %>% 
   kable(booktabs = TRUE, col.names = c("Suspect Frisked", "N Stops", "% Total Stops"), align = "l")
 
-# by suspected crime
-sqf_data %>% 
-  group_by(suspected_crime_description) %>%
-  summarize(N = n(),
-            pc_frisked = round((sum(frisked_flag == "Y")/N) * 100, 2),
-            pc_not_frisked = round((sum(frisked_flag == "N")/N) * 100, 2)
-            ) %>% 
-  arrange(desc(pc_frisked)) %>% 
-  kable(booktabs = TRUE, col.names = c("Suspected Crime", "N", "% Frisked", "% Not Frisked"), align = "l")
 
-# by race
-sqf_data %>% 
-  group_by(suspect_race_description) %>%
-  summarize(N = n(),
-            pc_frisked = round((sum(frisked_flag == "Y")/N) * 100, 2),
-            pc_not_frisked = round((sum(frisked_flag == "N")/N) * 100, 2)
-            ) %>% 
-  arrange(desc(pc_frisked)) %>% 
-  kable(booktabs = TRUE, col.names = c("Suspect Race", "N", "% Frisked", "% Not Frisked"), align = "l")
+# 100% stacked version
+ggplot(data = sqf_data, aes(x = frisked_flag, fill = suspect_race_description)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspect Arrested") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
+  labs(title = "Suspect Frisk Status by Race")
+
+# 100% stacked version
+ggplot(data = sqf_data, aes(x = suspect_arrested_flag, fill = suspect_race_description)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  facet_wrap(~suspected_crime_description) +
+  theme_minimal() +
+  xlab("Suspect Arrested") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
+  labs(title = "Suspect Arrest Status by Race")
+
 
 ```
 
@@ -229,6 +249,16 @@ sqf_data %>%
             Pc = N / nrow(sqf_data) * 100) %>%
   arrange(desc(N)) %>%
   kable(booktabs = TRUE, col.names = c("Suspect Searched", "N Stops", "% Total Stops"), align = "l")
+
+# 100% stacked version
+ggplot(data = sqf_data, aes(x = searched_flag, fill = suspect_race_description)) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspect Arrested") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
+  labs(title = "Suspect Search Status by Race")
 ```
 
 ## Arrest Status
@@ -260,7 +290,6 @@ ggplot(data = sqf_data, aes(x = suspect_arrested_flag, fill = suspect_race_descr
   ylab("% Observations") +
   scale_fill_brewer(type = "qual", palette = "Spectral", name = "Suspect Race") +
   labs(title = "Suspect Arrest Status by Race")
-
 ```
 
 ## Physical Force Status
@@ -294,6 +323,27 @@ sqf_data %>%
             Pc = N / nrow(sqf_data) * 100) %>%
   arrange(desc(N)) %>%
   kable(booktabs = TRUE, col.names = c("Suspect Race", "N Stops", "% Total Stops"), align = "l")  # small amount missing - solution?
+
+# summons offense
+sqf_data %>%
+  group_by(summons_offense_description) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Summons Offense Description", "N Stops", "% Total Stops"), align = "l")
+
+
+# suspect concealed weapon
+sqf_data %>%
+  group_by(suspects_actions_concealed_possession_weapon_flag) %>%
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>%
+  arrange(desc(N)) %>%
+  kable(booktabs = TRUE, col.names = c("Concealed Possession Weapon", "N Stops", "% Total Stops"), align = "l")
+
+
+
+
 
 # issuing office rank
 sqf_data %>%
