@@ -196,7 +196,7 @@ Note, following this cleaning, we now **drop observations** where the suspects r
 
 ```{r}
 sqf_data <- sqf_data %>%
-  filter(if_any(c(suspect_race_description, suspected_crime_description, suspect_sex), is.na))
+  filter(!is.na(suspected_crime_description) & !is.na(suspect_sex) & !is.na(suspect_race_description))
 
 dim(sqf_data)
 ```
