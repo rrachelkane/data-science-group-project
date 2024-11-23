@@ -1,5 +1,5 @@
 ---
-title: 'Final Project: X Prediction'
+title: 'Final Project: NYC Arrests Prediction'
 author: "Miraç Arda Balaban, Rachel Kane, Lucas Mordue, Gretchen Moulton"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -46,7 +46,7 @@ We begin the project by installing and loading in the necessary libraries.
 if (!require("pacman")) install.packages("pacman")
 library(pacman)
 
-p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis)
+p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt)
 ```
 
 We proceed by setting up the file path and importing the data.
@@ -94,15 +94,15 @@ colnames(sqf_data)[1:3]
 
 ## Relevant Columns
 
-Next, we drop all columns which cannot be used for our prediction question, as they are realized **after** the outcome of interest, namely X, or are irrelevant for other reasons. We drop spatial features other than police precinct of the stop and x and y coordinates of the stop.
+Next, we drop all columns which cannot be used for our prediction question, as they are realized **after** the outcome of interest, namely Y, or are irrelevant for other reasons. We drop spatial features other than police precinct of the stop and x and y coordinates of the stop.
 
 ```{r}
 sqf_data <- sqf_data %>% 
-  select(- c("stop_frisk_date", "record_status_code", "supervising_action_corresponding_activity_log_entry_reviewed", "stop_location_sector_code", "stop_location_apartment", "stop_location_full_address", "stop_location_patrol_boro_name", "stop_location_street_name", "suspect_other_description"))
+  select(- c("stop_frisk_date", "record_status_code", "supervising_action_corresponding_activity_log_entry_reviewed", "stop_location_sector_code", "stop_location_apartment", "stop_location_full_address", "stop_location_patrol_boro_name", "stop_location_street_name", "suspect_other_description", "observed_duration_minutes", "stop_duration_minutes"))
 
 # officer not explained stop description
 
-# this needs to be edited depending on what we choose for y, might drop observed_duration_minutes, top_duration, firearm etc flags, physical_force_ etc flags, suspects_actions (unclear when it occurs)
+# this needs to be edited depending on what we choose for y, might drop  firearm etc flags, physical_force_ etc flags, suspects_actions (unclear when it occurs)
 
 # check new dim
 dim(sqf_data)
@@ -293,9 +293,12 @@ We change the coding of binary variables from `"Y"` and `"N"`:
 # pre check
 print(unique(sqf_data$frisked_flag))
 
-# clean
+# clean Ys and Ns and set as numeric
 sqf_data <- sqf_data %>%
-  mutate(across(where(~ all(. %in% c("Y", "N"))), ~ ifelse(. == "Y", 1, ifelse(. == "N", 0, .))))
+  mutate(across(
+    where(~ all(. %in% c("Y", "N"))), 
+    ~ as.numeric(ifelse(. == "Y", 1, ifelse(. == "N", 0, NA)))  #
+  ))
 
 # post check
 print(unique(sqf_data$frisked_flag))
@@ -341,133 +344,234 @@ sqf_data <- sqf_data %>%
 Here we explore some basic summary statistics for the entire dataset.
 
 ```{r}
-# some overall basics
-head(sqf_data)
+# check dim again
+dim(sqf_data)
+
+# tabulation of y = arrest
+sqf_data %>% 
+  group_by(suspect_arrested_flag) %>% 
+  summarise(N = n(),
+            Pc = N / nrow(sqf_data) * 100) %>% 
+  arrange(desc(N)) %>% 
+  kable(booktabs = TRUE, col.names = c("Suspect Arrested", "N Stops", "% Total Stops"), align = "l")
 
 # sex
-ggplot(sqf_data, aes(x = suspect_sex)) +
+ggplot(sqf_data, aes(x = suspect_sex, fill = suspect_sex)) +
   geom_bar() +
+  labs(
+    title = "Distribution of Suspect Sex", 
+    x = "Sex", 
+    y = "Count"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("MALE" = "lightblue", "FEMALE" = "pink") 
+  ) +
+  theme(legend.position = "none")
+
+ggplot(sqf_data, aes(x = suspect_sex, fill = factor(suspect_arrested_flag))) +
+  geom_bar(position = "fill") +
   labs(title = "Distribution of Suspect Sex", 
        x = "Sex", 
        y = "Count") +
-  coord_flip() +
-  theme_minimal()
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_brewer(type = "qual", palette = "Pastel2", name = "Suspect Arrested") 
 
 # race
-ggplot(sqf_data, aes(x = suspect_race_description)) +
+ggplot(sqf_data, aes(x = suspect_race_description, fill = factor(suspect_race_description))) +
   geom_bar() +
-  labs(title = "Distribution of Suspect Race", 
-       x = "Sex", 
-       y = "Count") +
-  coord_flip() +
-  theme_minimal()
+  labs(
+    title = "Distribution of Suspect Race", 
+    x = "Race",  # Updated x-axis label
+    y = "Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
 
 # age
+
 # height
+
 # weight
+
 # time of stop
-# suspected crime
-# search, frisk, arrest
 
-# then do for Y and X of interest, grouped tables, hists, scatters, corr plots
-# check for any outliers and transform as needed
-# generate features as needed
-
-# may need to do this before/after spatial viz based on subsetting, generation etc
-
-```
-
-Next, we explore specific summary statistic for outcome of interest - `weapon_found_flag`.
-
-```{r}
-# if looking at cpw weapon question
-cpw_stops <- sqf_data %>% 
-  filter(suspected_crime_description == "CPW")
-
-dim(cpw_stops)
-
-cpw_stops %>% 
-  group_by(weapon_found_flag) %>% 
-  summarise(N = n(),
-            Pc = N / nrow(cpw_stops) * 100) %>% 
-  arrange(desc(N)) %>% 
-  kable(booktabs = TRUE, col.names = c("Weapon Found on Suspect", "N CPW Stops", "% Total CPW Stops"), align = "l")
-
-# bar plot
-ggplot(data = cpw_stops, aes(x = suspect_race_description, fill = weapon_found_flag)) +
+# arrests by race
+# not stacked
+ggplot(data = sqf_data, aes(x = suspect_race_description, fill = factor(suspect_arrested_flag))) +
   geom_bar() +
   coord_flip() +
   theme_minimal() +
   xlab("Suspect Race") +
   ylab("N Observations") +
-  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Weapon Found Flag") +
-  labs(title = "Weapon Found in CPW Stops, By Race")
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Race")
 
-# bar plot 100%
-ggplot(data = cpw_stops, aes(x = suspect_race_description, fill = weapon_found_flag)) +
+# stacked
+ggplot(data = sqf_data, aes(x = suspect_race_description, fill = factor(suspect_arrested_flag))) +
   geom_bar(position = "fill") +
   coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
   theme_minimal() +
   xlab("Suspect Race") +
   ylab("N Observations") +
-  scale_fill_brewer(type = "qual", palette = "Spectral", name = "Weapon Found Flag") +
-  labs(title = "Weapon Found in CPW Stops, By Race")
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Race")
+
+# add here suspected crime description
+
+# NB - others X/predictors of interest here - grouped tables, hists, scatters, corr matrices
+
+# check for any outliers and transform as needed
+
+# generate features as needed
+
 ```
 
-## Spatial Data Vizualisation
+## Spatial Data Visualisation
 
-```{r, fig.width = 12, fig.height = 10}
-dim(sqf_data)
+We first clean the data for spatial mapping using the `sf` and `nycgeo` packages. 
 
+We use this to obtain information about the stops at the census tract level, due to its granularity and the availability of population statistics at this level. **insert why relevant for prediction**
+
+```{r}
 # drop 7 observations which have incorrect spatial info
 sqf_data <- sqf_data %>% 
   filter(stop_location_x > 0)
 
 dim(sqf_data)
 
-# make spatial object
+# make spatial object for mapping
 sqf_data_sf <- st_as_sf(sqf_data, 
                         coords = c("stop_location_x", "stop_location_y"), 
-                        crs = 2263)  #  CRS for New York (EPSG:2263)
+                        crs = 2263)  #  crs for New York (EPSG:2263)
 
-# load in precinct-level shapefile
+# load in nta-level shapefile
 remotes::install_github("mfherman/nycgeo")
 library(nycgeo)
-nypd_shp <- nycgeo::nyc_boundaries(geography = "police")
+nyc_tract_shp <- nycgeo::nyc_boundaries(geography = "tract", add_acs_data = TRUE)
 
-# check crs is also EPSG 2263
-st_crs(nypd_shp) 
+# check crs
+st_crs(nyc_tract_shp)$epsg
+```
 
-# plot stop data by weapon found
+### Stop-Level Maps
+
+```{r}
+# plot data onto shapefile by arrest status
 ggplot() +
-  geom_sf(data = nypd_shp, fill = "lightblue", color = "black", size = 0.3) +
-  geom_sf(data = sqf_data_sf, aes(color = as.factor(weapon_found_flag)), size = 0.7, alpha = 0.4) +
-  scale_color_manual(values = c("red", "seagreen"),  
-                     labels = c("Weapon Found", "No Weapon Found")) +
-  theme_minimal() +
-  labs(title = "NYC Police Stops with Weapon Found Flag",
-       subtitle = "Stops plotted on NYC precinct boundaries") +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5),
-        legend.title = element_blank())
-
-# plot stop data by suspected crime
-ggplot() +
-  geom_sf(data = nypd_shp, fill = "lightblue", color = "black", size = 0.3) +
+  geom_sf(data = nyc_tract_shp, fill = "lightblue", color = "black", size = 0.3) +
   geom_sf(data = sqf_data_sf, aes(color = as.factor(suspect_arrested_flag)), size = 0.7) +
   scale_color_manual(values = c("red", "seagreen"),  
                      labels = c("Arrested", "Not Arrested")) +
   theme_minimal() +
-  labs(title = "NYC Police Stops by Arrest Status",
-       subtitle = "Stops plotted on NYC precinct boundaries") +
+  labs(title = "NYC Police Stops by Arrest Status") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         legend.title = element_blank())
+```
 
-# can add acs pop here and check stats on this also
+### Tract Level Maps
 
-# zoom in on manhattan for example
+Perhaps it is more informative to view the percentage of stops ending in arrest at the tract level:
 
+```{r}
+# join datasets to assign each stop to a tract
+sqf_data_sf <- st_join(sqf_data_sf, nyc_tract_shp)
+dim(sqf_data_sf)
+
+# aggregate to tract level
+sqf_data_sf_tract_level <- sqf_data_sf %>%
+  filter(!is.na(geoid)) %>%
+  group_by(geoid) %>%
+  summarize(pc_arrest = (sum(suspect_arrested_flag) / n()) * 100)
+
+# join with shp for mapping
+sqf_data_sf_tract_level <- nyc_tract_shp %>%
+  st_join(sqf_data_sf_tract_level, by = "geoid")
+  
+ggplot() +
+  geom_sf(data = sqf_data_sf_tract_level, aes(fill = pc_arrest), color = "black", size = 0.3) +
+  scale_fill_viridis_c(
+    name = "% Stops Ending in Arrest",
+    option = "inferno",
+    na.value = "white"
+  ) +
+  theme_void() +
+  labs(title = "Percentage of Stops Ending in Arrest by NYC Census Tract")
+
+```
+
+### Tract-Level Population Predictors
+
+Additionally, the `nycgeo` package allows us to link with neighbour tabulation area level American Community Survey (2013-2017) population statistics.
+
+We visualize those here:
+
+```{r}
+# non hispanic black
+ggplot(nyc_tract_shp) +
+  geom_sf(aes(fill = pop_black_est)) +
+  scale_fill_viridis_c(
+    name = "Non-Hispanic Black Population",
+    option = "inferno"
+  ) +
+  theme_void() +
+  labs(title = "Non-Hispanic Black Population by Census Tract, ACS 2013-2017")
+
+# hispanic any
+ggplot(nyc_tract_shp) +
+  geom_sf(aes(fill = pop_hisp_est)) +
+  scale_fill_viridis_c(
+    name = "Hispanic Any Race Population",
+    option = "inferno"
+  ) +
+  theme_void() +
+  labs(title = "Hispanic Any Race Population by Census Tract, ACS 2013-2017")
+
+# non
+ggplot(nyc_tract_shp) +
+  geom_sf(aes(fill = pop_asian_est)) +
+  scale_fill_viridis_c(
+    name = "Non-hispanic Asian Population",
+    option = "inferno"
+  ) +
+  theme_void() +
+  labs(title = "Non-hispanic Asian  Population by Census Tract, ACS 2013-2017")
+
+# pop age 25 years or older with at least bachelors degree
+ggplot(nyc_tract_shp) +
+  geom_sf(aes(fill = pop_ba_above_est)) +
+  scale_fill_viridis_c(
+    name = "Population Aged >= 25 with at Least Bachelors Degree",
+    option = "inferno"
+  ) +
+  theme_void() +
+  labs(title = "Population Aged >= 25 with at least a Bachelor's Degree by Census Tract, ACS 2013-2017")
+
+# income below pov
+# pop age 25 years or older with at least bachelors degree
+ggplot(nyc_tract_shp) +
+  geom_sf(aes(fill = pop_inpov_est)) +
+  scale_fill_viridis_c(
+    name = "Population With Income Below Poverty Line",
+    option = "inferno"
+  ) +
+  theme_void() +
+  labs(title = "Population with Income Below Poverty Line, ACS 2013-2017")
+```
+
+We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
+
+```{r}
+# 1/ keep tract and acs predictors as needed here in sqf_data by merging those cols by stop_id
+
+# 2/ drop the then in sqf_data which have missing values in any of these predictors
 ```
 
 # Regression Analysis
@@ -477,43 +581,19 @@ ggplot() +
 We first run the following model: **insert formula**
 
 ```{r}
+# NB!!!! use a version of data which drops irrelevant spatial attributes made in sf, 
+
+# just keep nta names and ACS data we want for prediction by merging those columns from the sf object into the original.
+
 # set seed for reproducibility
 set.seed(1)
 
-# split sample?
+# split sample - depends on if using 2022 to train?
 
-# gen train and test y
-
-# gen train and test X
+# insert lucas code
 regressors_1 <- c()
 
-# train_x <- model.matrix(~ . - 1, data = train %>% select(all_of(regressors_1)))
-# test_x <- model.matrix(~ . - 1, data = test %>% select(all_of(regressors_1)))
-# 
-# dim(train_x)
-# dim(test_x)
-# 
-# # run cv lasso
-# lasso_arrest <- cv.glmnet(x = train_x, y = train_arrest, alpha = 1, nfolds = 10, family = "binomial")
-# 
-# # get value of lambda that minimises cv mse in training sample
-# coef(lasso_arrest, s = "lambda.min")
-# 
-# # plot regression MSEs against log lambda
-# plot(lasso_arrest)
-# 
-# # plot coefficients against lambda
-# plot(lasso_arrest$glmnet.fit, xvar = "lambda", label = TRUE)
 
-# # get predicted values for this lambda with test data
-# lasso_arrest_pred_test <- predict(lasso_arrest, s = lasso_arrest$lambda.min, newx = test_x,type = "response")
-# 
-# mse_test <- mean((lasso_arrest_pred_test - test_arrest)^2)
-# 
-# print(mse_test)
-  
-
-# rocs a
 ```
 
 * state models, assumptions, evaluation criteria blah blah blah
@@ -525,4 +605,4 @@ regressors_1 <- c()
 
 ## Non-linear Methods
 
-# Conclusion
+## Conclusion
