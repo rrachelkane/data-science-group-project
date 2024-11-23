@@ -1,3 +1,4 @@
+
 ---
 title: 'Final Project: NYC Arrests Prediction'
 author: "Miraç Arda Balaban, Rachel Kane, Lucas Mordue, Gretchen Moulton"
@@ -605,4 +606,4 @@ regressors_1 <- c()
 
 ## Non-linear Methods
 
-## Conclusion
+# Conclusion

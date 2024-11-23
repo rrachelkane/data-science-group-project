@@ -1,12 +1,12 @@
 # data-science-group-project
 Repo for Foundations of Data Science group project, BSE T1 2024-5
 
-**Dataset:**
+**Dataset:** NYC SQF 2023
 
-**Setting:**
+**Setting:** NYC 2023
 
-**Target Variable:**
+**Target Variable:** Arrest
 
 **Key Features:**
 
-**Methods:**
+**Methods:** Lasso, Ridge, Elastic Net
