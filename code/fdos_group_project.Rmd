@@ -323,8 +323,12 @@ sqf_data <- sqf_data %>%
 We also convert other relevant variables to factors as needed:
 
 ```{r}
-sqf_data <- sqf_data %>% 
-  mutate(across(c(month2, day2, stop_was_initiated, issuing_officer_rank, supervising_officer_rank, suspected_crime_description, suspect_sex, suspect_race_description, suspect_body_build_type, suspect_eye_color, suspect_hair_color)))
+# convert character columns to factors, except for stop location x and y
+sqf_data <- sqf_data %>%
+  mutate(across(
+    .cols = where(is.character) & !c("stop_location_x", "stop_location_y"),
+    .fns = as.factor
+  ))
 
 # note delete eye color etc here if not using for prediction (drop to begin with)
 ```
@@ -570,9 +574,19 @@ ggplot(nyc_tract_shp) +
 We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
 
 ```{r}
-# 1/ keep tract and acs predictors as needed here in sqf_data by merging those cols by stop_id
+# check current dim
+dim(sqf_data)
 
-# 2/ drop the then in sqf_data which have missing values in any of these predictors
+sqf_data <- sqf_data %>%
+  # left join selected spatial features from the sf object into sqf_data
+  left_join(sqf_data_sf %>% select(stop_id, geoid, pop_ba_above_est, pop_inpov_est, pop_asian_est, pop_hisp_est, pop_black_est), by = "stop_id") %>% 
+  # drop x,y coords and geometry as we use census tract for spatial info
+  select(-c("stop_location_x", "stop_location_y", "geometry")) %>% 
+  # drop obs with missing values in these spatial features
+  filter(!if_any(everything(), is.na))
+
+# check new dim
+dim(sqf_data)
 ```
 
 # Regression Analysis
@@ -582,10 +596,6 @@ We keep only these predictors from the ACS data as predictors for our analysis, 
 We first run the following model: **insert formula**
 
 ```{r}
-# NB!!!! use a version of data which drops irrelevant spatial attributes made in sf, 
-
-# just keep nta names and ACS data we want for prediction by merging those columns from the sf object into the original.
-
 # set seed for reproducibility
 set.seed(1)
 
