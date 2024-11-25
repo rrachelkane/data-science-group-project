@@ -652,30 +652,115 @@ dim(sqf_data)
 ```
 
 # Regression Analysis
+# Notes (I couldn't get the MSE calculations to work, so they need some adjusting. The code was taking forever to run so I think each part works ok (apart from the MSE) but not certain about how it runs together. Finally, I am not sure I have got the cross-validation exactly right for elastic_net)
 
-## LASSO
-
-We first run the following model: **insert formula**
-
+## Data set-up
 ```{r}
-# set seed for reproducibility
-set.seed(1)
 
-# split sample - depends on if using 2022 to train?
+Y <- sqf_data$suspect_arrested_flag
 
-# insert lucas code
-regressors_1 <- c()
+# Use model.matrix to encode factors as dummy variables and remove stop_id
+# Keep all variables including dummies with little variation since
+# shrinkage estimation will shrink any estimators with no predictive power
+# down to or close to 0.
+X <- model.matrix(~ . - stop_id - suspect_arrested_flag, data = sqf_data)[, -1]
+
+# Split the data into training and testing sets
+set.seed(1)  # Set seed for reproducibility
+
+train_indices <- createDataPartition(Y, p = 2/3, list = FALSE)
+
+# Create training and testing datasets
+X_train <- X[train_indices, ]
+Y_train <- Y[train_indices]
+
+X_test <- X[-train_indices, ]
+Y_test <- Y[-train_indices]
 
 
 ```
 
-* state models, assumptions, evaluation criteria blah blah blah
-* run + check model diagnostics
+## Lasso
+```{r}
+
+set.seed(2)
+
+lasso_model <- cv.glmnet(x=X_train, y=Y_train, alpha = 1, family="binomial")
+best_lambda_lasso <- lasso_model$lambda.min
+cat("Optimal Lambda for Lasso:", best_lambda_lasso, "\n")
+
+lasso_predict <- predict(lasso_model, s = best_lambda_lasso, X_test, type = "response")
+mse_lasso <- mean((Y_test-cbind(1, X_test) %*% coef(lasso_predict, s='best_lambda_lasso'))**2)
+cat("Mean Squared Error on Lasso predictions:", mse_lasso, "\n")
+```
 
 ## Ridge
+```{r}
+
+set.seed(3)
+
+ridge_model <- cv.glmnet(X_train, Y_train, alpha = 0, family="binomial")
+best_lambda_ridge <- ridge_model$lambda.min
+cat("Optimal Lambda for Ridge:", best_lambda_ridge, "\n")
+
+ridge_predict <- predict(ridge_model, s = best_lambda_ridge, newx = X_test, type = "response")
+mse_ridge <- mean((Y_test-cbind(1, X_test) %*% coef(ridge_predict, s='best_lambda_ridge'))**2)
+cat("Mean Squared Error on ridge predictions:", mse_ridge, "\n")
+
+```
 
 ## Elastic-Net
+```{r}
 
-## Non-linear Methods
+set.seed(4)
+
+# Split training data into new training and validation data
+
+validate_indices <- createDataPartition(Y_train, p = 1/2, list = FALSE)
+
+X_train_en <- X_train[!validate_indices, ]
+Y_train_en <- Y_train[!validate_indices]
+
+X_validate_en <- X_train[validate_indices, ]
+Y_validate_en <- Y_train[validate_indices]
+
+X_test_en <- X_test
+Y_test_en <- Y_test
+
+elastic_net_model <- cv.glmnet(X_train, Y_train, alpha = 0, family="binomial")
+
+best_alpha_en <- NULL
+best_model_en <- NULL
+best_lambda_en <- NULL
+lowest_validation_mse <- Inf
+
+alpha_values <- seq(0, 1, by = 0.01)
+
+for (alpha in alpha_values) {
+  #Elastic Net model for varying alpha
+  en_model <- cv.glmnet(X_train_en, Y_train_en, alpha = alpha, family = "binomial"
+  )
+  
+en_validate <- predict(en_model, s = en_model$lambda.min, X_validate_en, type = "response")
+
+mse_validate_en <- mean((Y_validate_en-cbind(1, X_validate_en) %*% coef(en_validate,s='best_lamda_en'))**2)
+  
+  # Update best alpha and model if this alpha gives lower MSE
+  if (mse_validate_en < lowest_validation_mse) {
+    lowest_validation_mse <- mse_validate_en
+    best_alpha_en <- alpha
+    best_model_en <- en_model
+    best_lambda_en <- en_model$lambda.min
+  }
+}
+
+cat("Best Alpha:", best_alpha_en, "\n")
+cat("Best Lambda (optimized on validation data):", best_lambda_en, "\n")
+
+mse_test_en <- mean(((Y_test_en-cbind(1, X_test_en) %*% coef(en_validate,s='best_lamda_en'))**2)
+cat("Mean Squared Error on elastic net predictions:", mse_test_en, "\n")
+
+```
+
 
 # Conclusion
