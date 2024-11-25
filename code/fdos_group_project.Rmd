@@ -47,7 +47,7 @@ We begin the project by installing and loading in the necessary libraries.
 if (!require("pacman")) install.packages("pacman")
 library(pacman)
 
-p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt)
+p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt, forcats)
 ```
 
 We proceed by setting up the file path and importing the data.
@@ -408,7 +408,7 @@ ggplot(sqf_data, aes(x = suspect_race_description, fill = factor(suspect_race_de
 
 # arrests by race
 # not stacked
-ggplot(data = sqf_data, aes(x = suspect_race_description, fill = factor(suspect_arrested_flag))) +
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
   geom_bar() +
   coord_flip() +
   theme_minimal() +
@@ -418,20 +418,82 @@ ggplot(data = sqf_data, aes(x = suspect_race_description, fill = factor(suspect_
   labs(title = "Suspect Arrested, By Race")
 
 # stacked
-ggplot(data = sqf_data, aes(x = suspect_race_description, fill = factor(suspect_arrested_flag))) +
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
   geom_bar(position = "fill") +
   coord_flip() +
   scale_y_continuous(labels = scales::percent) +
   theme_minimal() +
   xlab("Suspect Race") +
-  ylab("N Observations") +
+  ylab("% Observations") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
   labs(title = "Suspect Arrested, By Race")
 
 # add here suspected crime description
+# not stacked
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description)), fill = factor(suspect_arrested_flag))) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspected Crime") +
+  ylab("N Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Suspected Crime")
 
-# NB - others X/predictors of interest here - grouped tables, hists, scatters, corr matrices
+# stacked
+ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspect_arrested_flag))) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  xlab("Suspected Crime") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Suspected Crime")
 
+# other stats
+
+# may need cleaning
+arrests_by_age_sex <- sqf_data %>%
+  mutate(
+    age_bucket = cut(
+      suspect_reported_age,
+      breaks = seq(0, 80, by = 15),
+      labels = paste(seq(0, 65, by = 15), seq(15, 80, by = 15), sep = "-"),
+      include.lowest = TRUE
+    ),
+    arrested_flag = factor(ifelse(suspect_arrested_flag == 1, "Arrested", "Not Arrested"), levels = c("Arrested", "Not Arrested"))
+  ) %>%
+  group_by(age_bucket, suspect_sex, arrested_flag) %>%
+  summarise(count = sum(!is.na(suspect_arrested_flag)), .groups = "drop") %>% # Correct counting
+  group_by(age_bucket, suspect_sex) %>%
+  mutate(percentage = 100 * count / sum(count)) %>% 
+  ungroup()
+
+# plot
+ggplot(arrests_by_age_sex, aes(x = age_bucket, y = percentage, fill = arrested_flag)) +
+  geom_col(alpha = 0.8, position = "stack") +
+  facet_wrap(~ suspect_sex, ncol = 2) +
+  scale_fill_brewer(palette = "Pastel1", name = "Outcome") + # edit colour ordering here
+  labs(x = "Age Bucket", y = "% of Individuals", fill = "Outcome") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # needs to be edited for NA
+
+# empirical cdf of age by sex and arrest status
+ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_flag))) +
+  stat_ecdf(geom = "step") +
+  facet_wrap(~ suspect_sex, ncol = 2) +
+  scale_color_manual(values = c("0" = "red", "1" = "darkgreen"),
+                     labels = c("Not Arrested", "Arrested"),
+                     name = "Arrest Outcome") +
+  labs(x = "Suspect Reported Age", y = "ECDF", title = "Empirical CDF of Suspect Reported Age, By Sex and Arrest Status") +
+  theme_minimal()
+
+
+
+# NB - others X/predictors of interest here  
+# grouped tables, bars
+
+# NB - scatters, corr matrices
 # check for any outliers and transform as needed
 
 # generate features as needed
