@@ -15,10 +15,13 @@ output:
 ---
 
 # Abstract
+In the early 2000s, the New York City Police Department was required to publicly report data on their stop-and-frisk program. This program allows officers to temporarily stop, question, and potentially frisk/search civilians they suspect may have committed a crime without needing evidence or a warrant. The stops may result in release, arrest, or criminal summons. As civilians can be stopped without evidence, we want to explore what variables are the most accurate prediction of the stop resulting in arrest. In order to predict arrests, we will use classification methods. WRITE MORE ABOUT METHODS, FINDINGS, and CONCLUSIONS
 
 The goal of our project is to predict Y. *edit, include key findings*
 
 # Introduction
+For over 20 years, civilians in NYC may be stopped, question, and searched by the police based solely on suspicion without any evidence. From 2002 – 2012, under Mayor Bloomberg’s administration, stops were more rampant, reaching a peak in 2011 with 685,724 reported stops (NYCLU 2024). With changes to administrations, the number of stops has decreased in recent years with 15,102 and 16,791 stops in 2022 and 2023 respectively. 
+The stop-and-frisk program has been highly criticized as it does not require evidence to stop individuals and may allow police to use racial profiling tactics to target individuals. For example, the American Civil Liberties Union of New York (NYCLU) has criticized the program as their investigation of the data found a disproportionate number of civilians stopped are people of color, in particular Black civilians, and some stops have resulted in police misconduct. As the stops do not require previous evidence or warrants, we are interested in predicting which stops result in arrest, particularly focusing on factors gathered before the stop begins that may predict arrest, such as demographic characteristics of civilians, location, time of day, and attributes of the police officers. 
 
 * **Target variable:**
 
