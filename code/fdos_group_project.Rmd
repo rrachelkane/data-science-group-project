@@ -52,7 +52,7 @@ We begin the project by installing and loading in the necessary libraries.
 if (!require("pacman")) install.packages("pacman")
 library(pacman)
 
-p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt, forcats, pROC)
+p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt, forcats, pROC, randomForest)
 ```
 
 We proceed by setting up the file path and importing the data from our project's GitHub repository.
@@ -343,8 +343,6 @@ sqf_data <- sqf_data %>%
     .cols = where(is.character) & !c("stop_location_x", "stop_location_y"),
     .fns = as.factor
   ))
-
-# note delete eye color etc here if not using for prediction (drop to begin with)
 ```
 
 We also make height and age numeric:
@@ -364,7 +362,7 @@ sqf_data <- sqf_data %>%
 # check dim again
 dim(sqf_data)
 
-# tabulation of y = arrest
+# tabulation of the dependent variable 
 sqf_data %>% 
   group_by(suspect_arrested_flag) %>% 
   summarise(N = n(),
@@ -372,7 +370,7 @@ sqf_data %>%
   arrange(desc(N)) %>% 
   kable(booktabs = TRUE, col.names = c("Suspect Arrested", "N Stops", "% Total Stops"), align = "l")
 
-# sex
+# looking at the distribution of sex
 ggplot(sqf_data, aes(x = suspect_sex, fill = suspect_sex)) +
   geom_bar() +
   labs(
@@ -396,24 +394,8 @@ ggplot(sqf_data, aes(x = suspect_sex, fill = factor(suspect_arrested_flag))) +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_brewer(type = "qual", palette = "Pastel2", name = "Suspect Arrested") 
 
-# race
-ggplot(sqf_data, aes(x = suspect_race_description, fill = factor(suspect_race_description))) +
-  geom_bar() +
-  labs(
-    title = "Distribution of Suspect Race", 
-    x = "Race",  # Updated x-axis label
-    y = "Count"
-  ) +
-  theme_minimal() +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  )
-
-
-# height by arrest flag
-ggplot(sqf_data, aes(x = suspect_height, color = factor(suspect_arrested_flag))) +
+# empirical cdf of age by sex and arrest status
+ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_flag))) +
   stat_ecdf(geom = "step") +
   facet_wrap(~ suspect_sex, ncol = 2) +
   scale_color_manual(values = c("0" = "red", "1" = "darkgreen"),
@@ -421,56 +403,6 @@ ggplot(sqf_data, aes(x = suspect_height, color = factor(suspect_arrested_flag)))
                      name = "Arrest Outcome") +
   labs(x = "Suspect Reported Age", y = "ECDF", title = "Empirical CDF of Suspect Reported Age, By Sex and Arrest Status") +
   theme_minimal()
-
-# weight
-
-# time of stop
-
-# arrests by race
-# not stacked
-ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
-  geom_bar() +
-  coord_flip() +
-  theme_minimal() +
-  xlab("Suspect Race") +
-  ylab("N Observations") +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Race")
-
-# stacked
-ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
-  geom_bar(position = "fill") +
-  coord_flip() +
-  scale_y_continuous(labels = scales::percent) +
-  theme_minimal() +
-  xlab("Suspect Race") +
-  ylab("% Observations") +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Race")
-
-# add here suspected crime description
-# not stacked
-ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description)), fill = factor(suspect_arrested_flag))) +
-  geom_bar() +
-  coord_flip() +
-  theme_minimal() +
-  xlab("Suspected Crime") +
-  ylab("N Observations") +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Suspected Crime")
-
-# stacked
-ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspect_arrested_flag))) +
-  geom_bar(position = "fill") +
-  coord_flip() +
-  scale_y_continuous(labels = scales::percent) +
-  theme_minimal() +
-  xlab("Suspected Crime") +
-  ylab("% Observations") +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Suspected Crime")
-
-# other stats
 
 # may need cleaning
 arrests_by_age_sex <- sqf_data %>%
@@ -498,34 +430,82 @@ ggplot(arrests_by_age_sex, aes(x = age_bucket, y = percentage, fill = arrested_f
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) # needs to be edited for NA
 
-# empirical cdf of age by sex and arrest status
-ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_flag))) +
-  stat_ecdf(geom = "step") +
-  facet_wrap(~ suspect_sex, ncol = 2) +
-  scale_color_manual(values = c("0" = "red", "1" = "darkgreen"),
-                     labels = c("Not Arrested", "Arrested"),
-                     name = "Arrest Outcome") +
-  labs(x = "Suspect Reported Age", y = "ECDF", title = "Empirical CDF of Suspect Reported Age, By Sex and Arrest Status") +
-  theme_minimal()
 
-# NB - others X/predictors of interest here - add some cop-side stuff
-# grouped tables, bars
+# distribution of race
+ggplot(sqf_data, aes(x = suspect_race_description, fill = factor(suspect_race_description))) +
+  geom_bar() +
+  labs(
+    title = "Distribution of Suspect Race", 
+    x = "Race",  # Updated x-axis label
+    y = "Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
 
-# NB - scatters, corr matrices
-# check for any outliers visually  and transform as needed
+# arrests by race, unstacked
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspect Race") +
+  ylab("N Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Race")
+
+# arrests by race, stacked
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  xlab("Suspect Race") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Race")
+
+# arrests by suspected crime description, unstacked
+ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description)), fill = factor(suspect_arrested_flag))) +
+  geom_bar() +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Suspected Crime") +
+  ylab("N Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Suspected Crime")
+
+# arrests by suspected crime description, stacked
+ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspect_arrested_flag))) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  theme_minimal() +
+  xlab("Suspected Crime") +
+  ylab("% Observations") +
+  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
+  labs(title = "Suspect Arrested, By Suspected Crime")
+
+
+# to be done:
+# time of stop
+
+# cop side stuff
+
+# any other variables of importance
+
+# cormat/heatmaps/PCA
+
+# look for outliers here!
 
 # generate features as needed
 ```
 
-Here we explore some basic summary statistics for the entire dataset.
+Here we explore some further summary statistics.
 
-First we will look at our six numerical variables: "stop_id", "year2"  "observed_duration_minutes", "stop_duration_minutes", "suspect_reported_age", "suspect_weight", "suspect_height"
-
-Since "stop_id" is the number given to each unique incident and "year2" is the year the stop occured which is 2023 for all observations so we can ignore these two numerical variables. 
-
-Let's take a look at summary statistics for the other numerical variables.
-
-**note** - maybe instead of doing this here, we do it after the current plots that use age and these variables, then show this after and clean by mutating rather than creating a new variable and dropping the old? not sure
+First we will look at our three key numeric variables: `suspect_reported_age`, `suspect_weight`, `suspect_height`.
 
 ```{r}
 # list of variables to summarize
@@ -678,6 +658,8 @@ ggplot() +
 
 Additionally, the `nycgeo` package allows us to link with neighbour tabulation area level American Community Survey (2013-2017) population statistics.
 
+**insert justification for why these - demographic stats of location of the stop - might be predictors of arrest **
+
 We visualize those here:
 
 ```{r}
@@ -755,9 +737,9 @@ dim(sqf_data)
 
 We first run LASSO, Ridge and Elastic Net regressions.
 
-We split our sample as [edit]
+We split our sample as [edit].
 
-We implement cross-validation in our training sample as [edit] . We use the default $k=10$ folds for computational reasons.
+We implement cross-validation in our training sample as [edit] . We use the default $k=10$ folds for computational efficiency.
 
 As we are operating in a classification setting, we choose the value of the parameter lambda that minimizes the **misclassification error**, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
 
@@ -767,7 +749,14 @@ This measures how costly false negatives are relative to false positives. The op
 
 We choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$.
 
-For each model, we also estimate using a matrix of predictors which excludes predictors related to search, physical force and frisk as [edit]
+For each model, we also estimate using a matrix of predictors which excludes predictors related to search, physical force and frisk as [edit].
+
+We evaluate all of our models based on their predictive performance:
+
+* in confusion matrices (in test data)
+* in ROC curves and associated AUCs (in test data)
+
+We also look at the variable importance between models.
 
 ## LASSO 
 
@@ -777,45 +766,40 @@ For each model, we also estimate using a matrix of predictors which excludes pre
 # set seed for reproducibility
 set.seed(1)
 
-# set training and test samples
+# set y and two predictor matrices (unsplit)
 y <- sqf_data$suspect_arrested_flag
-
-# set entire matrix of predictors
 X <- model.matrix(~ . - suspect_arrested_flag, data = sqf_data)
-
-# set the subset of predictors
 X_subset <- X[, !grepl("^(search|physical_force)", colnames(X)) &
                        !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag", 
                                                   "other_weapon_flag", "weapon_found_flag")]
 
-# split data into training and test samples
+# perform train-test split
 train_index <- createDataPartition(y, p = 0.7, list = FALSE)
-
-# gen y train and test
 y_train <- y[train_index]
-length(y_train)
-table(y_train)
-
 y_test <- y[-train_index]
-length(y_test)
-table(y_test)
-
-# gen X train and test, and same for subsets
 X_train <- X[train_index,]
-dim(X_train)
-
 X_test <- X[-train_index, ]
-dim(X_test)
-
 X_train_subset <- X_subset[train_index, ]
-dim(X_train_subset)
-
 X_test_subset <- X_subset[-train_index, ]
-dim(X_test_subset)
+
+# print lengths and dimensions
+cat("Length of y_train:", length(y_train), "\n")
+cat("Length of y_test:", length(y_test), "\n")
+cat("Dimensions of X_train:", dim(X_train), "\n")
+cat("Dimensions of X_test:", dim(X_test), "\n")
+cat("Dimensions of X_train_subset:", dim(X_train_subset), "\n")
+cat("Dimensions of X_test_subset:", dim(X_test_subset), "\n")
+
+# check balance of y
+cat("Balance of y_train:\n")
+print(table(y_train))
+cat("Balance of y_test:\n")
+print(table(y_test))
 
 # run lasso on training data to collect coefficients
 lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "class")
 
+# optimal lambda
 lasso_lambda_min <- lasso$lambda.min
 cat("Optimal Lambda for Lasso:", lasso_lambda_min, "\n")
 
@@ -833,63 +817,40 @@ title(main = "Coefficient Shrinkage Path for LASSO",
       xlab = "Log(Lambda)",
       ylab = "Coefficients")
 
-# get fitted probabilities
+# get fitted probabilities, using best lambda
 lasso_predict <- predict(lasso, s = lasso_lambda_min, X_test, type = "response")
 
-# add variable for classes
+# add variable for predicted classes
 lasso_y_hat <- ifelse(lasso_predict > 0.5, 1, 0)
 
-# define function to generate data for confusion matrix
-generate_cm <- function(true, predicted) {
-  as.data.frame(table(True = true, Predicted = predicted)) %>%
+# define function to generate and plot confusion matrix
+generate_cm <- function(true, predicted, title) {
+  cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
     group_by(Predicted) %>%
     mutate(Predicted_pct = Freq / sum(Freq))
+  
+  print(cm)
+  
+  plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
+    geom_tile() +
+    geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
+    scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
+    xlab("True") +
+    ylab("Predicted") +
+    labs(title = title) +
+    theme_minimal()
+  
+  # print the plot
+  print(plot)
 }
 
-# calculate confusion matrix for lasso regression out of sample
-lasso_cm <- generate_cm(y_test, lasso_y_hat)
+# plot confusion matrix for lasso regression out of sample
+generate_cm(y_test, lasso_y_hat, "Confusion Matrix for LASSO (Full Model)")
 
-# print table
-print(lasso_cm)
+# compute ROC
+lasso_roc_full <- roc(response = y_test, predictor = lasso_predict)
 
-#plot
-ggplot(data = lasso_cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-  geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-  xlab("True") +
-  ylab("Predicted") +
-  labs(title = "Confusion Matrix for LASSO Regression (Test Data)") +
-  theme_minimal()
-
-# define function for ROC
-compute_roc_auc <- function(y_true, y_pred, title) {
-  # Ensure y_pred is a numeric vector, not a matrix
-  y_pred <- as.vector(y_pred)
-
-  # Cbind true and predicted values into a single data frame
-  combined_df <- cbind.data.frame(True = y_true, Predicted = y_pred)
-
-  # Compute ROC and AUC using the combined data frame
-  roc_obj <- roc(response = combined_df$True, predictor = combined_df$Predicted, levels = rev(levels(factor(combined_df$True))))
-  auc_value <- round(auc(roc_obj), 4)
-
-  # Generate the ROC plot using ggplot2
-  roc_plot <- ggroc(roc_obj, legacy.axes = TRUE, color = "blue", size = 1) +
-    ggtitle(paste0(title, " (AUC = ", auc_value, ")")) +
-    xlab("False Positive Rate") +
-    ylab("True Positive Rate") +
-    theme_minimal() +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray")
-
-  # Print the plot
-  print(roc_plot)
-
-  # Return the AUC value
-  return(auc_value)
-}
-
-lasso_roc <- compute_roc_auc(y_test, lasso_predict, "ROC Curve for LASSO Out of Sample")
+# plot ROC
 ```
 
 ### Sensitivity Analysis - Subset of Predictors
@@ -917,26 +878,45 @@ title(main = "Coefficient Shrinkage Path for LASSO",
 # get fitted probabilities
 lasso_predict_subset <- predict(lasso_subset, s = lasso_lambda_min_subset, X_test_subset, type = "response")
 
-# add variable for classes
+# add variable for predicted classes
 lasso_y_hat_subset <- ifelse(lasso_predict_subset > 0.5, 1, 0)
 
-# calculate confusion matrix for lasso regression out of sample
-lasso_cm_subset <- generate_cm(y_test, lasso_y_hat_subset)
+# plot confusion matrix for lasso subset regression out of sample
+generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Model)")
 
-# print table
-print(lasso_cm_subset)
+# new function to compute and plot combined roc for full and subset models
+plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
+  # plot the full model roc curve
+  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
+       col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
+       main = 'ROC Curves')
+  
+  # add the subset model roc curve
+  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
+  
+  # add random guess line
+  abline(a = 0, b = 1, lty = 2, col = 'gray')
+  
+  # add grid
+  grid()
+  
+  # add legend
+  legend('bottomright',
+         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
+                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
+                    'Random Guess'),
+         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
+  
+  # add bounding box
+  box()
+}
 
-#plot
-ggplot(data = lasso_cm_subset, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-  geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-  xlab("True") +
-  ylab("Predicted") +
-  labs(title = "Confusion Matrix for LASSO Regression (Test Data - Subset)") +
-  theme_minimal()
+# compute roc object for subset model
+lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset)
 
-lasso_roc_subset <- compute_roc_auc(y_test, lasso_predict_subset, "ROC Curve for LASSO Out of Sample (Subset")
+# plot combined roc curve for lasso models
+plot_combined_roc(lasso_roc_full, lasso_roc_subset, "Lasso Full", "Lasso Subset")
+
 ```
 
 ## Ridge 
@@ -966,27 +946,14 @@ title(main = "coefficient shrinkage path for ridge",
 ridge_predict <- predict(ridge, s = ridge_lambda_min, X_test, type = "response")
 nrow(ridge_predict)
 
-# add variable for classes
+# add variable for predicted classes
 ridge_y_hat <- ifelse(ridge_predict > 0.5, 1, 0)
 
-# calculate confusion matrix for ridge regression out of sample
-ridge_cm <- generate_cm(y_test, ridge_y_hat)
+# plot confusion matrix for ridge regression out of sample
+generate_cm(y_test, ridge_y_hat, "Confusion Matrix for Ridge (Full Model)")
 
-# print table
-print(ridge_cm)
-
-# plot confusion matrix
-ggplot(data = ridge_cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-  geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "rel. freq.") +
-  xlab("true") +
-  ylab("predicted") +
-  labs(title = "confusion matrix for ridge regression (test data)") +
-  theme_minimal()
-
-# compute and plot roc for ridge
-ridge_roc <- compute_roc_auc(y_test, ridge_predict, "roc curve for ridge out of sample")
+# compute roc object for full ridge model
+ridge_roc_full <- roc(response = y_test, predictor = ridge_predict)
 ```
 
 ### Sensitivity Analysis - Subset
@@ -1015,28 +982,17 @@ title(main = "Coefficient Shrinkage Path for Ridge (Subset)",
 # get fitted probabilities
 ridge_predict_subset <- predict(ridge_subset, s = ridge_lambda_min_subset, X_test_subset, type = "response")
 
-# add variable for classes
+# add variable for predicted classes
 ridge_y_hat_subset <- ifelse(ridge_predict_subset > 0.5, 1, 0)
 
-# calculate confusion matrix for ridge regression (subset)
-ridge_cm_subset <- generate_cm(y_test, ridge_y_hat_subset)
+# plot confusion matrix for ridge subset regression out of sample
+generate_cm(y_test, ridge_y_hat_subset, "Confusion Matrix for Ridge (Subset Model)")
 
-# print table
-print(ridge_cm_subset)
+# compute roc object for subset ridge model
+ridge_roc_subset <- roc(response = y_test, predictor = ridge_predict_subset)
 
-# plot confusion matrix
-ggplot(data = ridge_cm_subset, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-  geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-  xlab("True") +
-  ylab("Predicted") +
-  labs(title = "Confusion Matrix for Ridge Regression (Test Data - Subset)") +
-  theme_minimal()
-
-# compute and plot roc for ridge (subset)
-ridge_roc_subset <- compute_roc_auc(y_test, ridge_predict_subset, "ROC Curve for Ridge Out of Sample (Subset)")
-
+# plot combined roc curve for ridge models
+plot_combined_roc(ridge_roc_full, ridge_roc_subset, "Ridge Full", "Ridge Subset")
 ```
 
 ## Elastic Net
@@ -1072,27 +1028,14 @@ title(main = "coefficient shrinkage path for elastic net",
 en_predict <- predict(en, s = en_lambda_min, X_test, type = "response")
 nrow(en_predict)
 
-# add variable for classes
+# add variable for predicted classes
 en_y_hat <- ifelse(en_predict > 0.5, 1, 0)
 
-# calculate confusion matrix for elastic net regression out of sample
-en_cm <- generate_cm(y_test, en_y_hat)
+# plot confusion matrix for en regression out of sample
+generate_cm(y_test, en_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
 
-# print table
-print(en_cm)
-
-# plot confusion matrix
-ggplot(data = en_cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-  geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "rel. freq.") +
-  xlab("true") +
-  ylab("predicted") +
-  labs(title = "confusion matrix for elastic net regression (test data)") +
-  theme_minimal()
-
-# compute and plot roc for elastic net
-en_roc <- compute_roc_auc(y_test, en_predict, "roc curve for elastic net out of sample")
+# compute roc object for subset ridge model
+en_roc_full <- roc(response = y_test, predictor = en_predict)
 ```
 
 ### Sensitivity Analysis - Subset
@@ -1122,31 +1065,152 @@ title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
 # get fitted probabilities for subset
 en_predict_subset <- predict(en_subset, s = en_lambda_min_subset, X_test_subset, type = "response")
 
-# add variable for classes for subset
+# add variable for predicted classes for subset
 en_y_hat_subset <- ifelse(en_predict_subset > 0.5, 1, 0)
 
-# calculate confusion matrix for elastic net subset regression out of sample
-en_cm_subset <- generate_cm(y_test, en_y_hat_subset)
+# plot confusion matrix for en_subset regression out of sample
+generate_cm(y_test, en_y_hat_subset, "Confusion Matrix for Elastic Net (Subset Model)")
 
-# print table for subset
-print(en_cm_subset)
+# compute roc object for subset ridge model
+en_roc_subset <- roc(response = y_test, predictor = en_predict_subset)
 
-# plot confusion matrix for elastic net subset
-ggplot(data = en_cm_subset, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
+# plot combined roc curve for ridge models
+plot_combined_roc(en_roc_full, en_roc_subset, "Elastic Net Full", "Elastic Net Subset")
+```
+
+## Variable Importance
+
+```{r}
+# insert most important coef here
+```
+
+# Random Forest
+
+Next, we implement the random forest algorithm [justification].
+
+We tune the maximum number features of the tree first.
+
+To do this, we split our current training data set into a training set and validation set.
+
+```{r}
+# subset training data for validation split
+n_train <- nrow(X_train)
+id_split <- sample(1:n_train, floor(0.5 * n_train))
+
+# split into training and validation sets
+X_train_final <- X_train[id_split, ]
+y_train_final <- y_train[id_split]
+X_val <- X_train[-id_split, ]
+y_val <- y_train[-id_split]
+
+# print dimensions
+cat("dimensions of X_train_final:", dim(X_train_final), "\n")
+cat("dimensions of y_train_final:", length(y_train_final), "\n")
+cat("dimensions of X_val:", dim(X_val), "\n")
+cat("dimensions of y_val:", length(y_val), "\n")
+
+# random forest tuning parameters
+ntree <- 500 # R default
+
+# we also use the default for bootstrap sample size, i.e nrow(X_train_final)
+
+# initialize performance storage
+train_acc <- test_acc <- oob_acc <- numeric(ncol(X_train))
+
+# tune random forest for max_features
+for (max_features in 1:15) { # setting this < ncol(X_train_final for now, just to check if it runs)
+  
+    # fit the rf model using training data
+    rf <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = max_features, ntree = ntree)
+
+    # use trained model to predict y with validation x
+    y_pred_val <- predict(rf, X_val)
+
+    # use trained model to predict y with training x
+    y_pred_train <- rf$predicted
+    
+    # compute OOB accuracy measure - OOB error rate
+    oob_acc[max_features] <- 1 - rf$err.rate[ntree, "OOB"]
+
+    # compute training accuracy
+    train_acc[max_features] <- mean(y_train_final == as.numeric(levels(y_pred_train)[y_pred_train]))
+    
+    # compute test (val) accuracy - key parameter of interest
+    test_acc[max_features] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
+}
+
+# identify best max_features in validation data
+m_star <- which.max(test_acc)
+cat("optimal mtry (max_features):", m_star, "\n")
+
+# plot accuracy metrics
+plot(seq_len(ncol(X_train)), train_acc, type = 'l', main = 'tuning mtry', ylab = 'accuracy', xlab = 'number of features', col = 'blue')
+lines(seq_len(ncol(X_train)), test_acc, col = 'red')
+lines(seq_len(ncol(X_train)), oob_acc, lty = 2, col = 'green')
+legend('bottomright', legend = c('train accuracy', 'validation accuracy', 'oob accuracy'), col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
+
+# train final random forest model with optimal m
+RFTuned <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = m_star, ntree = ntree)
+
+# predict using tuned model and test x
+RFPred <- predict(RFTuned, newdata = X_test)
+
+# compute fitted probabilities with tuned model and test x
+RFProb <- predict(RFTuned, newdata = X_test, type = "prob")
+
+# compute roc and auc for random forest
+RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1))
+RF_auc <- round(auc(RF_roc), 4)
+cat("random forest auc:", RF_auc, "\n")
+
+# plot roc curve
+plot(RF_roc, main = 'roc curve for random forest', col = 'darkblue', lwd = 2)
+abline(a = 0, b = 1, lty = 2, col = 'gray')
+legend('bottomright', legend = c(sprintf("rf auc: %.3f", RF_auc), 'random guess'), lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
+
+# generate confusion matrix
+cm_rf <- table(true = y_test, predicted = RFPred)
+cm_rf_df <- as.data.frame(cm_rf) %>%
+  group_by(true) %>%
+  mutate(relative_frequency = Freq / sum(Freq))
+
+# print confusion matrix
+print(cm_rf)
+
+# plot confusion matrix
+ggplot(cm_rf_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relative_frequency)) +
   geom_tile() +
-  geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-  scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-  xlab("True") +
-  ylab("Predicted") +
-  labs(title = "Confusion Matrix for Elastic Net Regression (Test Data - Subset)") +
+  geom_text(aes(label = sprintf("%.2f", relative_frequency)), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red", name = "rel. freq.") +
+  labs(title = "confusion matrix for random forest", x = "true", y = "predicted") +
   theme_minimal()
-
-# compute and plot roc for elastic net subset
-en_roc_subset <- compute_roc_auc(y_test, en_predict_subset, "ROC Curve for Elastic Net Out of Sample (Subset)")
 
 ```
 
-# Non-linear Methods
+## Tuning ntree 
+
+## Variable Importance
+
+```{r}
+# Extract Random Forest importance
+rf_importance <- data.frame(
+  Variable = rownames(RFTuned$importance),
+  Scaled_Importance = RFTuned$importance[, "MeanDecreaseGini"] / max(RFTuned$importance[, "MeanDecreaseGini"], na.rm = TRUE)
+)
+rf_importance <- rf_importance %>%
+  arrange(desc(Scaled_Importance))
+
+# plot rf var importance - top 20
+ggplot(rf_importance %>% arrange(desc(Scaled_Importance)) %>% slice(1:20), 
+       aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+  coord_flip() +
+  labs(title = "Top 20 Random Forest Variable Importance",
+       x = "Variable",
+       y = "Scaled Importance") +
+  theme_minimal()
+
+```
 
 # Lucas code
 Notes (I couldn't get the MSE calculations to work, so they need some adjusting. The code was taking forever to run so I think each part works ok (apart from the MSE) but not certain about how it runs together. Finally, I am not sure I have got the cross-validation exactly right for elastic_net)
