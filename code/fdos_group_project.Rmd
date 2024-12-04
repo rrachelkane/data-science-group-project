@@ -1042,6 +1042,47 @@ generate_cm(y_test, en_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
 en_roc_full <- roc(response = y_test, predictor = en_predict)
 ```
 
+Potential Alternative to optimising over alpha
+```{r}
+#alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
+#en_opt_best_alpha <- NULL
+#en_opt_best_auc <- -Inf  # Initialize with the lowest possible AUC
+#en_opt_best_model <- NULL
+#en_opt_best_lambda <- NULL
+
+# Iterate over alpha values
+#for (alpha in alpha_values) {
+  # Train Elastic Net model for the given alpha
+  #en_opt <- cv.glmnet(X_train, y_train, alpha = alpha, family = "binomial", type.measure = "class")
+  
+  # Get the best lambda from cross-validation
+  #en_opt_lambda_min <- en_opt$lambda.min
+  
+  # Predict probabilities on the validation set
+  #en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_test, type = "response")
+  
+  # Compute AUC
+  #en_opt_auc_value <- auc(response = y_test, predictor = en_opt_y_prob)
+  
+  # Update best alpha if AUC improves
+  #if (en_opt_auc_value > best_auc) {
+    #en_opt_best_auc <- en_opt_auc_value
+    #en_opt_best_alpha <- alpha
+    #en_opt_best_model <- en_opt_auc_value
+    #en_opt_best_lambda <- en_opt_lambda_min
+  #}
+  
+  # Print progress
+  #cat(sprintf("Alpha: %.2f, AUC: %.5f\n", alpha, en_opt_auc_value))
+#}
+
+# Output best alpha and its AUC
+#cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
+#cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
+
+# Best model is stored in `en_opt_best_model` with lambda = `en_opt_best_lambda`
+```
+
 ### Sensitivity Analysis - Subset
 
 ```{r}
