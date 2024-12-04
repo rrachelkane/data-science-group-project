@@ -333,6 +333,7 @@ sqf_data <- sqf_data %>%
 ```
 
 **Note** - do we want to keep stop hour as well? or just use time of day?
+-Lucas Answer: I would just use time of day but I would extend shift night along one hour and shorten morning/lengthen evening (or make them uniform blocks of 6 hours)
 
 We also convert other relevant variables to factors as needed:
 
@@ -537,6 +538,7 @@ print(summary_table)
 ```
 
 We will first look at standardizing our numerical variables as they use different scales. 
+*Note - Lucas* Do we have an idea of what these values are - surely there are some issues here if they aren't standardised since they all have a minimum of 1.
 
 ```{r}
 # list the variables to normalize
@@ -852,6 +854,8 @@ lasso_roc_full <- roc(response = y_test, predictor = lasso_predict)
 
 # plot ROC
 ```
+*Note - Lucas* Some issues with the graphics
+What is the benefit of doing the subset?
 
 ### Sensitivity Analysis - Subset of Predictors
 
@@ -1000,7 +1004,7 @@ plot_combined_roc(ridge_roc_full, ridge_roc_subset, "Ridge Full", "Ridge Subset"
 **insert formula**
 
 note no optimization of alpha here, yet
-
+*Note - Lucas* This is where we could use the basis of the earlier en regression I did. I.e. initialise an en with alpha of 0 and then increase alpha and replace it in the model only if it improves accuracy - to discuss
 note here - add training accuracy measures? to compare
 
 ```{r}
@@ -1186,10 +1190,12 @@ ggplot(cm_rf_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relat
   theme_minimal()
 
 ```
+*Note - Lucas* Surprised at low sensitivity of Random Forest - could this have something to do with the max number of features we include? I know this makes life very difficult and takes up a lot of computational time but we could keep it low and then run it up to 80 when we are fully finished with the code?
 
 ## Tuning ntree 
 
 ## Variable Importance
+*Note - Lucas* Search Basis incidental to arrest happens after arrest => should be dropped
 
 ```{r}
 # Extract Random Forest importance
@@ -1270,7 +1276,7 @@ Notes (I couldn't get the MSE calculations to work, so they need some adjusting.
 # cat("Mean Squared Error on ridge predictions:", mse_ridge, "\n")
 
 ```
-
+*Note - Lucas* Could use this approach to optimise over alpha
 
 ```{r}
 
