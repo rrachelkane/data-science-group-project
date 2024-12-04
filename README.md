@@ -7,6 +7,4 @@ Repo for Foundations of Data Science group project, BSE T1 2024-5
 
 **Target Variable:** Arrest
 
-**Key Features:**
-
-**Methods:** Lasso, Ridge, Elastic Net
+**Methods:** Lasso, Ridge, Elastic Net, Random Forest
