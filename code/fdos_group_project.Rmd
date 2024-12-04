@@ -314,10 +314,10 @@ We also bin the time of the stop from `stop_frisk_time`:
 sqf_data <- sqf_data %>%
   mutate(
     time_of_day = case_when(
-      str_extract(stop_frisk_time, "^\\d{2}") %in% c("05", "06", "07", "08", "09", "10", "11") ~ "Morning",
+      str_extract(stop_frisk_time, "^\\d{2}") %in% c("06", "07", "08", "09", "10", "11") ~ "Morning",
       str_extract(stop_frisk_time, "^\\d{2}") %in% c("12", "13", "14", "15", "16", "17") ~ "Afternoon",
-      str_extract(stop_frisk_time, "^\\d{2}") %in% c("18", "19", "20", "21") ~ "Evening",
-      str_extract(stop_frisk_time, "^\\d{2}") %in% c("22", "23", "00", "01", "02", "03", "04") ~ "Night",
+      str_extract(stop_frisk_time, "^\\d{2}") %in% c("18", "19", "20", "21", "22", "23") ~ "Evening",
+      str_extract(stop_frisk_time, "^\\d{2}") %in% c("00", "01", "02", "03", "04", "05") ~ "Night",
       TRUE ~ NA_character_  # Handle unexpected or missing values
     ),
     time_of_day = factor(time_of_day, levels = c("Morning", "Afternoon", "Evening", "Night"))  # Ensure factor order
@@ -335,6 +335,7 @@ sqf_data <- sqf_data %>%
 **Note** - do we want to keep stop hour as well? or just use time of day?
 -Lucas Answer: I would just use time of day but I would extend shift night along one hour and shorten morning/lengthen evening (or make them uniform blocks of 6 hours)
 
+
 We also convert other relevant variables to factors as needed:
 
 ```{r}
@@ -346,13 +347,138 @@ sqf_data <- sqf_data %>%
   ))
 ```
 
-We also make height and age numeric:
+Next, we will make `suspect_height`, `suspect_weight`, and `suspect_reported_age` numeric keeping in mind the factor levels to ensure R converts them correctly. Then, we will address outliers in the data. 
 
 ```{r}
-sqf_data <- sqf_data %>% 
-  mutate(suspect_reported_age = as.numeric(suspect_reported_age),
-         suspect_height = as.numeric(suspect_height),
-         suspect_weight = as.numeric(suspect_weight))
+library(dplyr)
+
+# Function to safely convert factor to numeric, handling non-numeric entries
+convert_to_numeric <- function(x) {
+  # Convert to character to avoid factor levels issues
+  x <- as.character(x)
+  
+  # Replace non-numeric values with NA (e.g., "unknown", "760", "7.6")
+  x <- gsub("[^0-9.]", "", x)
+  
+  # Convert to numeric
+  as.numeric(x)
+}
+
+# Apply the function to the relevant columns
+sqf_data <- sqf_data %>%
+  mutate(
+    suspect_reported_age = convert_to_numeric(suspect_reported_age),
+    suspect_height = convert_to_numeric(suspect_height),
+    suspect_weight = convert_to_numeric(suspect_weight)
+  )
+#Check to make sure successful
+summary(sqf_data$suspect_reported_age)
+summary(sqf_data$suspect_height)
+summary(sqf_data$suspect_weight)
+```
+
+Let's plot the density of age to see the distribution. Since we have some outliers, we are going to drop any observations where age is below 10 and above 85. 
+
+```{r}
+# Compute density for reported_age
+reported_age_density <- density(sqf_data$suspect_reported_age, na.rm = TRUE)
+
+# Plot the density
+plot(reported_age_density, 
+     main = "Density of Reported Age with Outliers Highlighted", 
+     xlab = "Reported Age", 
+     ylab = "Density", 
+     col = "black", 
+     lwd = 2)
+grid()
+
+# Identify and highlight outliers (ages < 10 and > 85)
+outliers <- sqf_data$suspect_reported_age[sqf_data$suspect_reported_age < 10 | sqf_data$suspect_reported_age > 85]
+
+# Add vertical lines to mark the outlier boundaries
+abline(v = c(10, 85), col = "deeppink", lty = 2, lwd = 2)
+
+# Highlight the outlier data points on the plot
+points(outliers, rep(0, length(outliers)), col = "deeppink", pch = 19)
+
+#We will drop outlier observations where age is above 85 and below 10.
+sqf_data <- sqf_data[sqf_data$suspect_reported_age >= 10 & sqf_data$suspect_reported_age <= 85, ]
+
+```
+
+We plot the density of height to see the distribution and identify outliers. Height appears to be measured in feet and we are going to drop observations below 4 ft and above 7 ft. 
+
+```{r}
+# Compute density for suspect_height
+height_density <- density(sqf_data$suspect_height, na.rm = TRUE)
+
+# Plot the density
+plot(height_density, 
+     main = "Density of Height with Outliers Highlighted", 
+     xlab = "Height", 
+     ylab = "Density", 
+     col = "black", 
+     lwd = 2)
+grid()
+
+# Identify and highlight outliers (e.g., heights below 4 feet and above 7 feet)
+outliers <- sqf_data$suspect_height[sqf_data$suspect_height < 4 | sqf_data$suspect_height > 7]
+
+# Add vertical lines to mark the outlier boundaries
+abline(v = c(4, 7), col = "darkorchid2", lty = 2, lwd = 2)
+
+# Highlight the outlier data points on the plot
+points(outliers, rep(0, length(outliers)), col = "darkorchid2", pch = 19)
+
+#We will drop outlier observations where height is above 7 ft and below 4 ft.
+sqf_data <- sqf_data[sqf_data$suspect_height >= 4 & sqf_data$suspect_height <= 7, ]
+```
+
+We plot the density of weight to identify outliers. The weight variable appears to be measured in pounds and it appears that some observations could have data entry errors (they are nonsensical). We will drop outliers above 300 lbs and below 90 lbs. 
+
+```{r}
+# Compute density for suspect_weight
+weight_density <- density(sqf_data$suspect_weight, na.rm = TRUE)
+
+# Plot the density
+plot(weight_density, 
+     main = "Density of Suspect Weight with Outliers Highlighted", 
+     xlab = "Weight", 
+     ylab = "Density", 
+     col = "black", 
+     lwd = 2)
+grid()
+
+# Identify and highlight outliers (e.g., weights below 90 lbs and above 300 lbs)
+outliers <- sqf_data$suspect_weight[sqf_data$suspect_weight < 90 | sqf_data$suspect_weight > 300]
+
+# Add vertical lines to mark the outlier boundaries
+abline(v = c(90, 300), col = "darkturquoise", lty = 2, lwd = 2)
+
+# Highlight the outlier data points on the plot
+points(outliers, rep(0, length(outliers)), col = "darkturquoise", pch = 19)
+
+#We will drop outlier observations where height is above 300 lbs. and below 90 lbs.
+sqf_data <- sqf_data[sqf_data$suspect_weight >= 90 & sqf_data$suspect_weight <= 300, ]
+
+```
+
+Finally, we will standardize our numerical variables as they use different scales. 
+
+```{r}
+# Standardize the numeric variables
+sqf_data <- sqf_data %>%
+  mutate(
+    suspect_reported_age = scale(suspect_reported_age),
+    suspect_height = scale(suspect_height),
+    suspect_weight = scale(suspect_weight)
+  )
+
+# Check if the standardization worked by summarizing the variables
+summary(sqf_data$suspect_reported_age)
+summary(sqf_data$suspect_height)
+summary(sqf_data$suspect_weight)
+
 ```
 
 # Exploratory Data Analysis
