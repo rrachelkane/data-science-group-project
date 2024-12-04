@@ -859,10 +859,7 @@ We evaluate all of our models based on their predictive performance:
 
 We also look at the variable importance between models.
 
-## LASSO 
-
-**insert formula**
-
+Set training and test data (70/30 split), and create a subset with fewer variables to test and train with.  
 ```{r}
 # set seed for reproducibility
 set.seed(1)
@@ -901,6 +898,113 @@ print(table(y_train))
 cat("Balance of y_test:\n")
 print(table(y_test))
 
+```
+##Logistic Regression
+`
+```{r}
+# For logistic regression we need to convert X_train and X_test to a data.frame 
+X_train_df <- as.data.frame(X_train)  
+X_train_subset_df <- as.data.frame(X_train_subset)
+
+X_test_df <- as.data.frame(X_test)
+X_test_subset_df <- as.data.frame(X_test_subset)  
+
+
+#Logistic Regression for all variables and the subset
+logit_all <- glm(y_train ~ ., data = X_train_df, family = binomial(logit))
+summary(logit_all)
+
+logit_sub <- glm(y_train ~ ., data = X_train_subset_df, family = binomial(logit))
+summary(logit_sub)
+
+predict_all <- predict(logit_all, newdata = X_test_df, type = "response")
+
+predict_sub <- predict(logit_sub, newdata = X_test_subset_df, type = "response")
+
+```
+```{r}
+library(pROC)
+# Compute ROC and AUC for the model with all features
+roc_all <- roc(y_test, predict_all) 
+auc_all <- round(auc(roc_all), 4) 
+cat("AUC for the model with all features:", auc_all, "\n")
+
+# Compute ROC and AUC for the model with subset of features
+roc_sub <- roc(y_test, predict_sub)  
+auc_sub <- round(auc(roc_sub), 4)  
+cat("AUC for the model with subset features:", auc_sub, "\n")
+
+# Function to compute and plot combined ROC curves
+plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
+  # Plot the full model ROC curve
+  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
+       col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
+       main = 'ROC Curves for Logistic Regression Models')
+  
+  # Add the subset model ROC curve
+  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
+  
+  # Add random guess line
+  abline(a = 0, b = 1, lty = 2, col = 'gray')
+  
+  # Add grid
+  grid()
+  
+  # Add legend
+  legend('bottomright',
+         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
+                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
+                    'Random Guess'),
+         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
+  
+  # Add bounding box
+  box()
+}
+
+# Call the function to plot the combined ROC curves
+plot_combined_roc(roc_all, roc_sub, "Full Model", "Subset Model")
+
+# Define a function to generate and plot confusion matrix
+generate_cm <- function(true, predicted, title) {
+  # Create a confusion matrix as a data frame
+  cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
+    group_by(Predicted) %>%
+    mutate(Predicted_pct = Freq / sum(Freq))
+  
+  # Print the confusion matrix
+  print(cm)
+  
+  # Plot the confusion matrix
+  plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
+    geom_tile() +
+    geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
+    scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
+    xlab("True") +
+    ylab("Predicted") +
+    labs(title = title) +
+    theme_minimal()
+  
+  # Print the plot
+  print(plot)
+}
+
+# Convert probabilities to binary predictions using a threshold of 0.5
+predict_all_binary <- ifelse(predict_all > 0.5, 1, 0)
+predict_sub_binary <- ifelse(predict_sub > 0.5, 1, 0)
+
+# Plot confusion matrix for logistic regression with all variables
+generate_cm(y_test, predict_all_binary, "Confusion Matrix for Logistic Regression (Full Model)")
+
+# Plot confusion matrix for logistic regression with subset of variables
+generate_cm(y_test, predict_sub_binary, "Confusion Matrix for Logistic Regression (Subset Model)")
+
+```
+
+## LASSO 
+
+**insert formula**
+
+```{r}
 # run lasso on training data to collect coefficients
 lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "class")
 
