@@ -768,7 +768,7 @@ set.seed(1)
 
 # set y and two predictor matrices (unsplit)
 y <- sqf_data$suspect_arrested_flag
-X <- model.matrix(~ . - suspect_arrested_flag, data = sqf_data)
+X <- model.matrix(~ . - suspect_arrested_flag - stop_id, data = sqf_data)
 X_subset <- X[, !grepl("^(search|physical_force)", colnames(X)) &
                        !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag", 
                                                   "other_weapon_flag", "weapon_found_flag")]
@@ -1096,94 +1096,94 @@ To do this, we split our current training data set into a training set and valid
 # subset training data for validation split
 n_train <- nrow(X_train)
 id_split <- sample(1:n_train, floor(0.5 * n_train))
-
-# split into training and validation sets
-X_train_final <- X_train[id_split, ]
-y_train_final <- y_train[id_split]
-X_val <- X_train[-id_split, ]
-y_val <- y_train[-id_split]
-
-# print dimensions
-cat("dimensions of X_train_final:", dim(X_train_final), "\n")
-cat("dimensions of y_train_final:", length(y_train_final), "\n")
-cat("dimensions of X_val:", dim(X_val), "\n")
-cat("dimensions of y_val:", length(y_val), "\n")
-
-# random forest tuning parameters
-ntree <- 500 # R default
-
-# we also use the default for bootstrap sample size, i.e nrow(X_train_final)
-
-# initialize performance storage
-train_acc <- test_acc <- oob_acc <- numeric(ncol(X_train))
-
-# tune random forest for max_features
-for (max_features in 1:15) { # setting this < ncol(X_train_final for now, just to check if it runs)
-  
-    # fit the rf model using training data
-    rf <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = max_features, ntree = ntree)
-
-    # use trained model to predict y with validation x
-    y_pred_val <- predict(rf, X_val)
-
-    # use trained model to predict y with training x
-    y_pred_train <- rf$predicted
-    
-    # compute OOB accuracy measure - OOB error rate
-    oob_acc[max_features] <- 1 - rf$err.rate[ntree, "OOB"]
-
-    # compute training accuracy
-    train_acc[max_features] <- mean(y_train_final == as.numeric(levels(y_pred_train)[y_pred_train]))
-    
-    # compute test (val) accuracy - key parameter of interest
-    test_acc[max_features] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
-}
-
-# identify best max_features in validation data
-m_star <- which.max(test_acc)
-cat("optimal mtry (max_features):", m_star, "\n")
-
-# plot accuracy metrics
-plot(seq_len(ncol(X_train)), train_acc, type = 'l', main = 'tuning mtry', ylab = 'accuracy', xlab = 'number of features', col = 'blue')
-lines(seq_len(ncol(X_train)), test_acc, col = 'red')
-lines(seq_len(ncol(X_train)), oob_acc, lty = 2, col = 'green')
-legend('bottomright', legend = c('train accuracy', 'validation accuracy', 'oob accuracy'), col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
-
-# train final random forest model with optimal m
-RFTuned <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = m_star, ntree = ntree)
-
-# predict using tuned model and test x
-RFPred <- predict(RFTuned, newdata = X_test)
-
-# compute fitted probabilities with tuned model and test x
-RFProb <- predict(RFTuned, newdata = X_test, type = "prob")
-
-# compute roc and auc for random forest
-RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1))
-RF_auc <- round(auc(RF_roc), 4)
-cat("random forest auc:", RF_auc, "\n")
-
-# plot roc curve
-plot(RF_roc, main = 'roc curve for random forest', col = 'darkblue', lwd = 2)
-abline(a = 0, b = 1, lty = 2, col = 'gray')
-legend('bottomright', legend = c(sprintf("rf auc: %.3f", RF_auc), 'random guess'), lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
-
-# generate confusion matrix
-cm_rf <- table(true = y_test, predicted = RFPred)
-cm_rf_df <- as.data.frame(cm_rf) %>%
-  group_by(true) %>%
-  mutate(relative_frequency = Freq / sum(Freq))
-
-# print confusion matrix
-print(cm_rf)
-
-# plot confusion matrix
-ggplot(cm_rf_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relative_frequency)) +
-  geom_tile() +
-  geom_text(aes(label = sprintf("%.2f", relative_frequency)), color = "white") +
-  scale_fill_gradient(low = "blue", high = "red", name = "rel. freq.") +
-  labs(title = "confusion matrix for random forest", x = "true", y = "predicted") +
-  theme_minimal()
+# 
+# # split into training and validation sets
+ X_train_final <- X_train[id_split, ]
+ y_train_final <- y_train[id_split]
+ X_val <- X_train[-id_split, ]
+ y_val <- y_train[-id_split]
+# 
+# # print dimensions
+# cat("dimensions of X_train_final:", dim(X_train_final), "\n")
+# cat("dimensions of y_train_final:", length(y_train_final), "\n")
+# cat("dimensions of X_val:", dim(X_val), "\n")
+# cat("dimensions of y_val:", length(y_val), "\n")
+# 
+# # random forest tuning parameters
+# ntree <- 500 # R default
+# 
+# # we also use the default for bootstrap sample size, i.e nrow(X_train_final)
+# 
+# # initialize performance storage
+# train_acc <- test_acc <- oob_acc <- numeric(ncol(X_train))
+# 
+# # tune random forest for max_features
+# for (max_features in 1:15) { # setting this < ncol(X_train_final for now, just to check if it runs)
+#   
+#     # fit the rf model using training data
+#     rf <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = max_features, ntree = ntree)
+# 
+#     # use trained model to predict y with validation x
+#     y_pred_val <- predict(rf, X_val)
+# 
+#     # use trained model to predict y with training x
+#     y_pred_train <- rf$predicted
+#     
+#     # compute OOB accuracy measure - OOB error rate
+#     oob_acc[max_features] <- 1 - rf$err.rate[ntree, "OOB"]
+# 
+#     # compute training accuracy
+#     train_acc[max_features] <- mean(y_train_final == as.numeric(levels(y_pred_train)[y_pred_train]))
+#     
+#     # compute test (val) accuracy - key parameter of interest
+#     test_acc[max_features] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
+# }
+# 
+# # identify best max_features in validation data
+# m_star <- which.max(test_acc)
+# cat("optimal mtry (max_features):", m_star, "\n")
+# 
+# # plot accuracy metrics
+# plot(seq_len(ncol(X_train)), train_acc, type = 'l', main = 'tuning mtry', ylab = 'accuracy', xlab = 'number of features', col = 'blue')
+# lines(seq_len(ncol(X_train)), test_acc, col = 'red')
+# lines(seq_len(ncol(X_train)), oob_acc, lty = 2, col = 'green')
+# legend('bottomright', legend = c('train accuracy', 'validation accuracy', 'oob accuracy'), col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
+# 
+# # train final random forest model with optimal m
+# RFTuned <- randomForest(x = X_train_final, y = factor(y_train_final), mtry = m_star, ntree = ntree)
+# 
+# # predict using tuned model and test x
+# RFPred <- predict(RFTuned, newdata = X_test)
+# 
+# # compute fitted probabilities with tuned model and test x
+# RFProb <- predict(RFTuned, newdata = X_test, type = "prob")
+# 
+# # compute roc and auc for random forest
+# RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1))
+# RF_auc <- round(auc(RF_roc), 4)
+# cat("random forest auc:", RF_auc, "\n")
+# 
+# # plot roc curve
+# plot(RF_roc, main = 'roc curve for random forest', col = 'darkblue', lwd = 2)
+# abline(a = 0, b = 1, lty = 2, col = 'gray')
+# legend('bottomright', legend = c(sprintf("rf auc: %.3f", RF_auc), 'random guess'), lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
+# 
+# # generate confusion matrix
+# cm_rf <- table(true = y_test, predicted = RFPred)
+# cm_rf_df <- as.data.frame(cm_rf) %>%
+#   group_by(true) %>%
+#   mutate(relative_frequency = Freq / sum(Freq))
+# 
+# # print confusion matrix
+# print(cm_rf)
+# 
+# # plot confusion matrix
+# ggplot(cm_rf_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relative_frequency)) +
+#   geom_tile() +
+#   geom_text(aes(label = sprintf("%.2f", relative_frequency)), color = "white") +
+#   scale_fill_gradient(low = "blue", high = "red", name = "rel. freq.") +
+#   labs(title = "confusion matrix for random forest", x = "true", y = "predicted") +
+#   theme_minimal()
 
 ```
 
@@ -1192,15 +1192,91 @@ ggplot(cm_rf_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relat
 ## Variable Importance
 
 ```{r}
+# # Extract Random Forest importance
+# rf_importance <- data.frame(
+#   Variable = rownames(RFTuned$importance),
+#   Scaled_Importance = RFTuned$importance[, "MeanDecreaseGini"] / max(RFTuned$importance[, "MeanDecreaseGini"], na.rm = TRUE)
+# )
+# rf_importance <- rf_importance %>%
+#   arrange(desc(Scaled_Importance))
+# 
+# # plot rf var importance - top 20
+# ggplot(rf_importance %>% arrange(desc(Scaled_Importance)) %>% slice(1:20), 
+#        aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
+#   geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+#   coord_flip() +
+#   labs(title = "Top 20 Random Forest Variable Importance",
+#        x = "Variable",
+#        y = "Scaled Importance") +
+#   theme_minimal()
+
+```
+
+## Random Forest for Subset
+
+```{r}
+# Subset training data for validation split
+n_train_subset <- nrow(X_train_subset) # Use subset for training
+id_split_subset <- sample(1:n_train_subset, floor(0.5 * n_train_subset)) # 50% split for training and validation
+
+# Split into training and validation sets for X only
+X_train_subset_final <- X_train_subset[id_split_subset, ]
+X_val_subset <- X_train_subset[-id_split_subset, ]
+
+# Print dimensions
+cat("Dimensions of X_train_subset_final:", dim(X_train_subset_final), "\n")
+cat("Dimensions of X_val_subset:", dim(X_val_subset), "\n")
+
+# Random forest tuning parameters
+ntree <- 500 # R default
+
+# Default bootstrap sample size is nrow(X_train_subset_final)
+
+# Initialize performance storage
+train_acc_subset <- test_acc_subset <- oob_acc_subset <- numeric(ncol(X_train_subset_final))
+
+# Tune random forest for max_features
+for (max_features in 1:15) { # Ensure < ncol(X_train_subset_final) for testing
+  
+    # Fit the rf model using training data
+    rf <- randomForest(x = X_train_subset_final, y = factor(y_train_final), 
+                       mtry = max_features, ntree = ntree)
+
+    # Use trained model to predict y with validation x
+    y_pred_val_subset <- predict(rf, X_val_subset)
+
+    # Use trained model to predict y with training x
+    y_pred_train_subset <- rf$predicted
+    
+    # Compute OOB accuracy measure - OOB error rate
+    oob_acc_subset[max_features] <- 1 - rf$err.rate[ntree, "OOB"]
+
+    # Compute training accuracy
+    train_acc_subset[max_features] <- mean(y_train_final == 
+                                            as.numeric(levels(y_pred_train_subset)[y_pred_train_subset]))
+    
+    # Compute test (val) accuracy - key parameter of interest
+    test_acc_subset[max_features] <- mean(y_val == 
+                                           as.numeric(levels(y_pred_val_subset)[y_pred_val_subset]))
+}
+
+# Identify best max_features in validation data
+m_star_subset <- which.max(test_acc_subset)
+cat("Optimal mtry (max_features):", m_star_subset, "\n")
+
+# Train final random forest model with optimal mtry
+RFTuned_subset <- randomForest(x = X_train_subset_final, y = factor(y_train_final), 
+                               mtry = m_star_subset, ntree = ntree)
+
 # Extract Random Forest importance
 rf_importance <- data.frame(
-  Variable = rownames(RFTuned$importance),
-  Scaled_Importance = RFTuned$importance[, "MeanDecreaseGini"] / max(RFTuned$importance[, "MeanDecreaseGini"], na.rm = TRUE)
+  Variable = rownames(RFTuned_subset$importance),
+  Scaled_Importance = RFTuned_subset$importance[, "MeanDecreaseGini"] / max(RFTuned_subset$importance[, "MeanDecreaseGini"], na.rm = TRUE)
 )
 rf_importance <- rf_importance %>%
   arrange(desc(Scaled_Importance))
 
-# plot rf var importance - top 20
+# Plot RF variable importance - top 20
 ggplot(rf_importance %>% arrange(desc(Scaled_Importance)) %>% slice(1:20), 
        aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
   geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
@@ -1210,67 +1286,44 @@ ggplot(rf_importance %>% arrange(desc(Scaled_Importance)) %>% slice(1:20),
        y = "Scaled Importance") +
   theme_minimal()
 
-```
+# Predict using tuned model on test set
+RFPred_subset <- predict(RFTuned_subset, newdata = X_test_subset)
 
-# Lucas code
-Notes (I couldn't get the MSE calculations to work, so they need some adjusting. The code was taking forever to run so I think each part works ok (apart from the MSE) but not certain about how it runs together. Finally, I am not sure I have got the cross-validation exactly right for elastic_net)
+# Compute fitted probabilities with tuned model on test set
+RFProb_subset <- predict(RFTuned_subset, newdata = X_test_subset, type = "prob")
 
-**Note** - just commenting this out so it runs fine, until can check this
+# Compute ROC and AUC for Random Forest
+RF_roc_subset <- roc(response = factor(y_test), predictor = RFProb_subset[, 2], levels = c(0, 1))
+RF_auc_subset <- round(auc(RF_roc_subset), 4)
+cat("Random Forest AUC (Subset):", RF_auc_subset, "\n")
 
- Data set-up
+# Plot ROC curve
+plot(RF_roc_subset, main = 'ROC Curve for Random Forest (Subset)', col = 'darkblue', lwd = 2)
+abline(a = 0, b = 1, lty = 2, col = 'gray')
+legend('bottomright', legend = c(sprintf("RF AUC: %.3f", RF_auc_subset), 'Random Guess'), lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
 
-```{r}
+# Generate confusion matrix
+cm_rf_subset <- table(true = y_test, predicted = RFPred_subset)
+cm_rf_subset_df <- as.data.frame(cm_rf_subset) %>%
+  group_by(true) %>%
+  mutate(relative_frequency = Freq / sum(Freq))
 
-# Y <- sqf_data$suspect_arrested_flag
-# 
-# # Use model.matrix to encode factors as dummy variables and remove stop_id
-# # Keep all variables including dummies with little variation since
-# # shrinkage estimation will shrink any estimators with no predictive power
-# # down to or close to 0.
-# X <- model.matrix(~ . - stop_id - suspect_arrested_flag, data = sqf_data)[, -1]
-# 
-# # Split the data into training and testing sets
-# set.seed(1)  # Set seed for reproducibility
-# 
-# train_indices <- createDataPartition(Y, p = 2/3, list = FALSE)
-# 
-# # Create training and testing datasets
-# X_train <- X[train_indices, ]
-# Y_train <- Y[train_indices]
-# 
-# X_test <- X[-train_indices, ]
-# Y_test <- Y[-train_indices]
+# Print confusion matrix
+print(cm_rf_subset)
 
-
-```
-
-```{r}
-# 
-# set.seed(2)
-# 
-# lasso_model <- cv.glmnet(x=X_train, y=Y_train, alpha = 1, family="binomial")
-# best_lambda_lasso <- lasso_model$lambda.min
-# cat("Optimal Lambda for Lasso:", best_lambda_lasso, "\n")
-# 
-# lasso_predict <- predict(lasso_model, s = best_lambda_lasso, X_test, type = "response")
-# mse_lasso <- mean((Y_test-cbind(1, X_test) %*% coef(lasso_predict, s='best_lambda_lasso'))**2)
-# cat("Mean Squared Error on Lasso predictions:", mse_lasso, "\n")
-```
-
-```{r}
-
-# set.seed(3)
-# 
-# ridge_model <- cv.glmnet(X_train, Y_train, alpha = 0, family="binomial")
-# best_lambda_ridge <- ridge_model$lambda.min
-# cat("Optimal Lambda for Ridge:", best_lambda_ridge, "\n")
-# 
-# ridge_predict <- predict(ridge_model, s = best_lambda_ridge, newx = X_test, type = "response")
-# mse_ridge <- mean((Y_test-cbind(1, X_test) %*% coef(ridge_predict, s='best_lambda_ridge'))**2)
-# cat("Mean Squared Error on ridge predictions:", mse_ridge, "\n")
+# Plot confusion matrix
+ggplot(cm_rf_subset_df, aes(x = as.factor(true), y = as.factor(predicted), fill = relative_frequency)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", relative_frequency)), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
+  labs(title = "Confusion Matrix for Random Forest (Subset)", x = "True", y = "Predicted") +
+  theme_minimal()
 
 ```
 
+
+
+# lucas code elastic net
 
 ```{r}
 
