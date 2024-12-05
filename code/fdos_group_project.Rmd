@@ -314,27 +314,23 @@ We also bin the time of the stop from `stop_frisk_time`:
 sqf_data <- sqf_data %>%
   mutate(
     time_of_day = case_when(
+      str_extract(stop_frisk_time, "^\\d{2}") %in% c("00", "01", "02", "03", "04", "05") ~ "Late Night",
       str_extract(stop_frisk_time, "^\\d{2}") %in% c("06", "07", "08", "09", "10", "11") ~ "Morning",
       str_extract(stop_frisk_time, "^\\d{2}") %in% c("12", "13", "14", "15", "16", "17") ~ "Afternoon",
       str_extract(stop_frisk_time, "^\\d{2}") %in% c("18", "19", "20", "21", "22", "23") ~ "Evening",
-      str_extract(stop_frisk_time, "^\\d{2}") %in% c("00", "01", "02", "03", "04", "05") ~ "Night",
-      TRUE ~ NA_character_  # Handle unexpected or missing values
+      TRUE ~ NA_character_
     ),
-    time_of_day = factor(time_of_day, levels = c("Morning", "Afternoon", "Evening", "Night"))  # Ensure factor order
+    time_of_day = factor(time_of_day, levels = c("Late Night", "Morning", "Afternoon", "Evening"))
   )
 
-# Verify the result
+# check
 print(table(sqf_data$time_of_day))
 
-# drop stop frisk time as we will just use time_of_day
-sqf_data <- sqf_data %>% 
+# now drop stop frisk time as we will just use time_of_day
+sqf_data <- sqf_data %>%
   select(-"stop_frisk_time")
 
 ```
-
-**Note** - do we want to keep stop hour as well? or just use time of day?
--Lucas Answer: I would just use time of day but I would extend shift night along one hour and shorten morning/lengthen evening (or make them uniform blocks of 6 hours)
-
 
 We also convert other relevant variables to factors as needed:
 
@@ -347,126 +343,125 @@ sqf_data <- sqf_data %>%
   ))
 ```
 
-Next, we will make `suspect_height`, `suspect_weight`, and `suspect_reported_age` numeric keeping in mind the factor levels to ensure R converts them correctly. Then, we will address outliers in the data. 
+Next, we will make `suspect_height`, `suspect_weight`, and `suspect_reported_age` numeric keeping in mind the factor levels to ensure R converts them correctly. Then, we will address outliers in the data.
 
 ```{r}
-library(dplyr)
-
-# Function to safely convert factor to numeric, handling non-numeric entries
+# define convert factor to numeric, handling non-numeric entries
 convert_to_numeric <- function(x) {
-  # Convert to character to avoid factor levels issues
+  # convert to character to avoid factor levels issues
   x <- as.character(x)
-  
-  # Replace non-numeric values with NA (e.g., "unknown", "760", "7.6")
+ 
+  # replace non-numeric values with NA (e.g., "unknown", "760", "7.6")
   x <- gsub("[^0-9.]", "", x)
-  
-  # Convert to numeric
+ 
+  # convert to numeric
   as.numeric(x)
 }
 
-# Apply the function to the relevant columns
+# apply the function to the relevant columns
 sqf_data <- sqf_data %>%
   mutate(
     suspect_reported_age = convert_to_numeric(suspect_reported_age),
     suspect_height = convert_to_numeric(suspect_height),
     suspect_weight = convert_to_numeric(suspect_weight)
   )
-#Check to make sure successful
+
+# check to make sure successful
 summary(sqf_data$suspect_reported_age)
 summary(sqf_data$suspect_height)
 summary(sqf_data$suspect_weight)
 ```
 
-Let's plot the density of age to see the distribution. Since we have some outliers, we are going to drop any observations where age is below 10 and above 85. 
+Let's plot the density of age to see the distribution. Since we have some outliers, we are going to drop any observations where age is below 10 and above 85.
 
 ```{r}
-# Compute density for reported_age
+# compute density for reported_age
 reported_age_density <- density(sqf_data$suspect_reported_age, na.rm = TRUE)
 
-# Plot the density
-plot(reported_age_density, 
-     main = "Density of Reported Age with Outliers Highlighted", 
-     xlab = "Reported Age", 
-     ylab = "Density", 
-     col = "black", 
+# plot the density
+plot(reported_age_density,
+     main = "Density of Reported Age with Outliers Highlighted",
+     xlab = "Reported Age",
+     ylab = "Density",
+     col = "black",
      lwd = 2)
 grid()
 
-# Identify and highlight outliers (ages < 10 and > 85)
+# identify and highlight outliers (ages < 10 and > 85)
 outliers <- sqf_data$suspect_reported_age[sqf_data$suspect_reported_age < 10 | sqf_data$suspect_reported_age > 85]
 
-# Add vertical lines to mark the outlier boundaries
+# add vertical lines to mark the outlier boundaries
 abline(v = c(10, 85), col = "deeppink", lty = 2, lwd = 2)
 
-# Highlight the outlier data points on the plot
+# highlight the outlier data points on the plot
 points(outliers, rep(0, length(outliers)), col = "deeppink", pch = 19)
 
-#We will drop outlier observations where age is above 85 and below 10.
+# drop outlier observations where age is above 85 and below 10.
 sqf_data <- sqf_data[sqf_data$suspect_reported_age >= 10 & sqf_data$suspect_reported_age <= 85, ]
 
 ```
 
-We plot the density of height to see the distribution and identify outliers. Height appears to be measured in feet and we are going to drop observations below 4 ft and above 7 ft. 
+We plot the density of height to see the distribution and identify outliers. Height appears to be measured in feet and we are going to drop observations below 4 ft and above 7 ft.
 
 ```{r}
-# Compute density for suspect_height
+# compute density for suspect_height
 height_density <- density(sqf_data$suspect_height, na.rm = TRUE)
 
-# Plot the density
-plot(height_density, 
-     main = "Density of Height with Outliers Highlighted", 
-     xlab = "Height", 
-     ylab = "Density", 
-     col = "black", 
+# plot the density
+plot(height_density,
+     main = "Density of Height with Outliers Highlighted",
+     xlab = "Height",
+     ylab = "Density",
+     col = "black",
      lwd = 2)
 grid()
 
-# Identify and highlight outliers (e.g., heights below 4 feet and above 7 feet)
+# identify and highlight outliers (e.g., heights below 4 feet and above 7 feet)
 outliers <- sqf_data$suspect_height[sqf_data$suspect_height < 4 | sqf_data$suspect_height > 7]
 
-# Add vertical lines to mark the outlier boundaries
+# add vertical lines to mark the outlier boundaries
 abline(v = c(4, 7), col = "darkorchid2", lty = 2, lwd = 2)
 
-# Highlight the outlier data points on the plot
+# highlight the outlier data points on the plot
 points(outliers, rep(0, length(outliers)), col = "darkorchid2", pch = 19)
 
-#We will drop outlier observations where height is above 7 ft and below 4 ft.
+# drop outlier observations where height is above 7 ft and below 4 ft.
 sqf_data <- sqf_data[sqf_data$suspect_height >= 4 & sqf_data$suspect_height <= 7, ]
 ```
 
-We plot the density of weight to identify outliers. The weight variable appears to be measured in pounds and it appears that some observations could have data entry errors (they are nonsensical). We will drop outliers above 300 lbs and below 90 lbs. 
+We plot the density of weight to identify outliers. The weight variable appears to be measured in pounds and it appears that some observations could have data entry errors (they are nonsensical). We will drop outliers above 300 lbs and below 90 lbs.
 
 ```{r}
-# Compute density for suspect_weight
+# compute density for suspect_weight
 weight_density <- density(sqf_data$suspect_weight, na.rm = TRUE)
 
-# Plot the density
-plot(weight_density, 
-     main = "Density of Suspect Weight with Outliers Highlighted", 
-     xlab = "Weight", 
-     ylab = "Density", 
-     col = "black", 
+# plot the density
+plot(weight_density,
+     main = "Density of Suspect Weight with Outliers Highlighted",
+     xlab = "Weight",
+     ylab = "Density",
+     col = "black",
      lwd = 2)
 grid()
 
-# Identify and highlight outliers (e.g., weights below 90 lbs and above 300 lbs)
+# identify and highlight outliers (e.g., weights below 90 lbs and above 300 lbs)
 outliers <- sqf_data$suspect_weight[sqf_data$suspect_weight < 90 | sqf_data$suspect_weight > 300]
 
-# Add vertical lines to mark the outlier boundaries
+# add vertical lines to mark the outlier boundaries
 abline(v = c(90, 300), col = "darkturquoise", lty = 2, lwd = 2)
 
-# Highlight the outlier data points on the plot
+# highlight the outlier data points on the plot
 points(outliers, rep(0, length(outliers)), col = "darkturquoise", pch = 19)
 
-#We will drop outlier observations where height is above 300 lbs. and below 90 lbs.
+# drop outlier observations where height is above 300 lbs. and below 90 lbs.
 sqf_data <- sqf_data[sqf_data$suspect_weight >= 90 & sqf_data$suspect_weight <= 300, ]
 
 ```
 
-Finally, we will standardize our numerical variables as they use different scales. 
+Finally, we will standardize our numerical variables as they use different scales.
 
 ```{r}
-# Standardize the numeric variables
+# standardize the numeric variables
 sqf_data <- sqf_data %>%
   mutate(
     suspect_reported_age = scale(suspect_reported_age),
@@ -474,11 +469,10 @@ sqf_data <- sqf_data %>%
     suspect_weight = scale(suspect_weight)
   )
 
-# Check if the standardization worked by summarizing the variables
+# check if the standardization worked by summarizing the variables
 summary(sqf_data$suspect_reported_age)
 summary(sqf_data$suspect_height)
 summary(sqf_data$suspect_weight)
-
 ```
 
 # Exploratory Data Analysis
@@ -590,20 +584,14 @@ ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspe
 
 
 # to be done:
-# time of stop
 
-# cop side stuff
+# borough of stop & arrests
 
-# any other variables of importance
+# time of day of stop & arrests
 
-# cormat/heatmaps/PCA
-
-# look for outliers here!
-
-# generate features as needed
+# issuing officer rank & arrests
 ```
 
-```
 
 ## Spatial Data Visualisation
 
@@ -760,21 +748,21 @@ dim(sqf_data)
 
 # Regression Analysis
 
-We first run LASSO, Ridge and Elastic Net regressions.
+## Logistic Regression
 
-We split our sample as [edit].
+We split our sample as [justify].
 
-We implement cross-validation in our training sample as [edit] . We use the default $k=10$ folds for computational efficiency.
+For each model type, we estimate using two different matrices of predictors to test sensitivity of prediction accuracy:
 
-As we are operating in a classification setting, we choose the value of the parameter lambda that minimizes the **misclassification error**, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
+* the first drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was carried out **after** an arrest. As we are ultimately interested in predicting arrest status ex-ante to the stop from the police officer's perspective [edit]
 
-The cost ratio is: $$C = \frac{L(1,0)}{L(0,1)}$$. 
+* the second matrix - subset - also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest [edit].
+
+The cost ratio is: $$C = \frac{L(1,0)}{L(0,1)}$$.
 
 This measures how costly false negatives are relative to false positives. The optimal decision is $$\hat{y_i} = 1 \iff p_i > {1 \over 1+C}$$
 
 We choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$.
-
-For each model, we also estimate using a matrix of predictors which excludes predictors related to search, physical force and frisk as [edit].
 
 We evaluate all of our models based on their predictive performance:
 
@@ -783,18 +771,18 @@ We evaluate all of our models based on their predictive performance:
 
 We also look at the variable importance between models.
 
-Set training and test data (70/30 split), and create a subset with fewer variables to test and train with.  
 ```{r}
 # set seed for reproducibility
 set.seed(1)
 
 # set y and two predictor matrices (unsplit)
 y <- sqf_data$suspect_arrested_flag
-X <- model.matrix(~ . - suspect_arrested_flag - stop_id, data = sqf_data) #remove unique id
+
+X <- model.matrix(~ . - suspect_arrested_flag - stop_id -search_basis_incidental_to_arrest_flag, data = sqf_data) #remove unique id
 
 # set x subset, removing anything that is/might be realized during the stop
 X_subset <- X[, !grepl("^(search|physical_force|.*eye_color)", colnames(X)) &
-                 !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag", 
+                 !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag",
                                      "other_weapon_flag", "weapon_found_flag", "other_contraband_flag")]
 
 colnames(X_subset)
@@ -821,12 +809,12 @@ cat("Balance of y_train:\n")
 print(table(y_train))
 cat("Balance of y_test:\n")
 print(table(y_test))
-
 ```
-##Logistic Regression
-`
+
+Now the data is prepared, we run the logistic regressions:
+
 ```{r}
-# For logistic regression we need to convert X_train and X_test to a data.frame 
+# For logistic regression we need to convert X_train and X_test to a data.frame
 X_train_df <- as.data.frame(X_train)  
 X_train_subset_df <- as.data.frame(X_train_subset)
 
@@ -834,23 +822,21 @@ X_test_df <- as.data.frame(X_test)
 X_test_subset_df <- as.data.frame(X_test_subset)  
 
 
-#Logistic Regression for all variables and the subset
+# run logit for first set of predictors
 logit_all <- glm(y_train ~ ., data = X_train_df, family = binomial(logit))
-summary(logit_all)
 
+# run logit for subset of predictors
 logit_sub <- glm(y_train ~ ., data = X_train_subset_df, family = binomial(logit))
-summary(logit_sub)
 
+# predict in test data
 predict_all <- predict(logit_all, newdata = X_test_df, type = "response")
 
+# predict in test data
 predict_sub <- predict(logit_sub, newdata = X_test_subset_df, type = "response")
 
-```
-```{r}
-library(pROC)
 # Compute ROC and AUC for the model with all features
-roc_all <- roc(y_test, predict_all) 
-auc_all <- round(auc(roc_all), 4) 
+roc_all <- roc(y_test, predict_all)
+auc_all <- round(auc(roc_all), 4)
 cat("AUC for the model with all features:", auc_all, "\n")
 
 # Compute ROC and AUC for the model with subset of features
@@ -864,23 +850,23 @@ plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
   plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
        col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
        main = 'ROC Curves for Logistic Regression Models')
-  
+ 
   # Add the subset model ROC curve
   lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
-  
+ 
   # Add random guess line
   abline(a = 0, b = 1, lty = 2, col = 'gray')
-  
+ 
   # Add grid
   grid()
-  
+ 
   # Add legend
   legend('bottomright',
          legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
                     sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
                     'Random Guess'),
          lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
-  
+ 
   # Add bounding box
   box()
 }
@@ -894,10 +880,10 @@ generate_cm <- function(true, predicted, title) {
   cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
     group_by(Predicted) %>%
     mutate(Predicted_pct = Freq / sum(Freq))
-  
+ 
   # Print the confusion matrix
   print(cm)
-  
+ 
   # Plot the confusion matrix
   plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
     geom_tile() +
@@ -907,24 +893,29 @@ generate_cm <- function(true, predicted, title) {
     ylab("Predicted") +
     labs(title = title) +
     theme_minimal()
-  
+ 
   # Print the plot
   print(plot)
 }
 
-# Convert probabilities to binary predictions using a threshold of 0.5
+# convert probabilities to binary predictions using a threshold of 0.5
 predict_all_binary <- ifelse(predict_all > 0.5, 1, 0)
 predict_sub_binary <- ifelse(predict_sub > 0.5, 1, 0)
 
-# Plot confusion matrix for logistic regression with all variables
+# plot confusion matrix for logistic regression with all variables
 generate_cm(y_test, predict_all_binary, "Confusion Matrix for Logistic Regression (Full Model)")
 
-# Plot confusion matrix for logistic regression with subset of variables
+# plot confusion matrix for logistic regression with subset of variables
 generate_cm(y_test, predict_sub_binary, "Confusion Matrix for Logistic Regression (Subset Model)")
-
 ```
 
-## LASSO 
+We now run penalised regressions; LASSO, Ridge and Elastic Net.
+
+We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
+
+As we are operating in a classification setting, we choose the value of the parameter lambda that minimizes the **misclassification error**, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
+
+## LASSO
 
 **insert formula**
 
@@ -956,39 +947,14 @@ lasso_predict <- predict(lasso, s = lasso_lambda_min, X_test, type = "response")
 # add variable for predicted classes
 lasso_y_hat <- ifelse(lasso_predict > 0.5, 1, 0)
 
-# define function to generate and plot confusion matrix
-generate_cm <- function(true, predicted, title) {
-  cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
-    group_by(Predicted) %>%
-    mutate(Predicted_pct = Freq / sum(Freq))
-  
-  print(cm)
-  
-  plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-    geom_tile() +
-    geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-    scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-    xlab("True") +
-    ylab("Predicted") +
-    labs(title = title) +
-    theme_minimal()
-  
-  # print the plot
-  print(plot)
-}
-
 # plot confusion matrix for lasso regression out of sample
 generate_cm(y_test, lasso_y_hat, "Confusion Matrix for LASSO (Full Model)")
 
 # compute ROC
 lasso_roc_full <- roc(response = y_test, predictor = lasso_predict)
-
-# plot ROC
 ```
-*Note - Lucas* Some issues with the graphics
-What is the benefit of doing the subset?
 
-### Sensitivity Analysis - Subset of Predictors
+### LASSO Sensitivity Analysis - Subset
 
 ```{r}
 # run lasso on training data to collect coefficients
@@ -1019,42 +985,16 @@ lasso_y_hat_subset <- ifelse(lasso_predict_subset > 0.5, 1, 0)
 # plot confusion matrix for lasso subset regression out of sample
 generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Model)")
 
-# new function to compute and plot combined roc for full and subset models
-plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
-  # plot the full model roc curve
-  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
-       col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
-       main = 'ROC Curves')
-  
-  # add the subset model roc curve
-  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
-  
-  # add random guess line
-  abline(a = 0, b = 1, lty = 2, col = 'gray')
-  
-  # add grid
-  grid()
-  
-  # add legend
-  legend('bottomright',
-         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
-                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
-                    'Random Guess'),
-         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
-  
-  # add bounding box
-  box()
-}
-
 # compute roc object for subset model
 lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset)
 
 # plot combined roc curve for lasso models
 plot_combined_roc(lasso_roc_full, lasso_roc_subset, "Lasso Full", "Lasso Subset")
-
 ```
 
-## Ridge 
+## Ridge
+
+**insert formula**
 
 ```{r}
 # run ridge regression on training data to collect coefficients
@@ -1091,7 +1031,7 @@ generate_cm(y_test, ridge_y_hat, "Confusion Matrix for Ridge (Full Model)")
 ridge_roc_full <- roc(response = y_test, predictor = ridge_predict)
 ```
 
-### Sensitivity Analysis - Subset
+### Ridge Sensitivity Analysis - Subset
 
 ```{r}
 # run ridge regression on subset predictors
@@ -1173,51 +1113,6 @@ generate_cm(y_test, en_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
 en_roc_full <- roc(response = y_test, predictor = en_predict)
 ```
 
-
-### Tuning Alpha
-
-Potential Alternative to optimising over alpha
-
-```{r}
-#alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
-#en_opt_best_alpha <- NULL
-#en_opt_best_auc <- -Inf  # Initialize with the lowest possible AUC
-#en_opt_best_model <- NULL
-#en_opt_best_lambda <- NULL
-
-# Iterate over alpha values
-#for (alpha in alpha_values) {
-  # Train Elastic Net model for the given alpha
-  #en_opt <- cv.glmnet(X_train, y_train, alpha = alpha, family = "binomial", type.measure = "class")
-  
-  # Get the best lambda from cross-validation
-  #en_opt_lambda_min <- en_opt$lambda.min
-  
-  # Predict probabilities on the validation set
-  #en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_test, type = "response")
-  
-  # Compute AUC
-  #en_opt_auc_value <- auc(response = y_test, predictor = en_opt_y_prob)
-  
-  # Update best alpha if AUC improves
-  #if (en_opt_auc_value > best_auc) {
-    #en_opt_best_auc <- en_opt_auc_value
-    #en_opt_best_alpha <- alpha
-    #en_opt_best_model <- en_opt_auc_value
-    #en_opt_best_lambda <- en_opt_lambda_min
-  #}
-  
-  # Print progress
-  #cat(sprintf("Alpha: %.2f, AUC: %.5f\n", alpha, en_opt_auc_value))
-#}
-
-# Output best alpha and its AUC
-#cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-#cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
-
-# Best model is stored in `en_opt_best_model` with lambda = `en_opt_best_lambda`
-```
-
 ### Sensitivity Analysis - Subset
 
 ```{r}
@@ -1258,19 +1153,65 @@ en_roc_subset <- roc(response = y_test, predictor = en_predict_subset)
 plot_combined_roc(en_roc_full, en_roc_subset, "Elastic Net Full", "Elastic Net Subset")
 ```
 
-## Variable Importance
+### Tuning Alpha
+
+Now, we tune $\alpha$, as [demonstrate rationale]
+
+NB here - I just use the subset in random forest, because 1 it takes a while to run, so not gonna do both, and 2 its more conservative for ex-ante arrest prediction - cops are interested in predicting arrest before theyve began to interact with the person, just observables available to them before working the stop
+
+i think here we should tune alpha then for the subset example
 
 ```{r}
-# insert most important coef from the models here
+#alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
+#en_opt_best_alpha <- NULL
+#en_opt_best_auc <- -Inf  # Initialize with the lowest possible AUC
+#en_opt_best_model <- NULL
+#en_opt_best_lambda <- NULL
+
+# Iterate over alpha values
+#for (alpha in alpha_values) {
+  # Train Elastic Net model for the given alpha
+  #en_opt <- cv.glmnet(X_train, y_train, alpha = alpha, family = "binomial", type.measure = "class")
+ 
+  # Get the best lambda from cross-validation
+  #en_opt_lambda_min <- en_opt$lambda.min
+ 
+  # Predict probabilities on the validation set
+  #en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_test, type = "response")
+ 
+  # Compute AUC
+  #en_opt_auc_value <- auc(response = y_test, predictor = en_opt_y_prob)
+ 
+  # Update best alpha if AUC improves
+  #if (en_opt_auc_value > best_auc) {
+    #en_opt_best_auc <- en_opt_auc_value
+    #en_opt_best_alpha <- alpha
+    #en_opt_best_model <- en_opt_auc_value
+    #en_opt_best_lambda <- en_opt_lambda_min
+  #}
+ 
+  # Print progress
+  #cat(sprintf("Alpha: %.2f, AUC: %.5f\n", alpha, en_opt_auc_value))
+#}
+
+# Output best alpha and its AUC
+#cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
+#cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
+
+# Best model is stored in `en_opt_best_model` with lambda = `en_opt_best_lambda`
 ```
+
+## Variable Importance
+
+top 20 for logit, lasso, ridge, tuned en
 
 # Random Forest
 
 Next, we implement the random forest algorithm [justification].
 
-We do this on the subset of the data as.
+We do this on the subset of the data as [justification].
 
-We tune the maximum number features of the tree first.
+We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as [elaborate here - mainly computational and want to just simplify the model].
 
 To do this, we split our current training data set into a training set and validation set.
 
@@ -1291,59 +1232,77 @@ cat("dimensions of y_train_final:", length(y_train_final), "\n")
 cat("dimensions of X_val:", dim(X_val_subset), "\n")
 cat("dimensions of y_val:", length(y_val), "\n")
 
-# random forest tuning parameters
-ntree <- 100 # can optimize over thislater
+# Initialize parameter grid for grid search
+ntrees <- seq(50, 150, 50)  # range of trees to tune over
+max_features_range <- 1:20  # Range of mtry  (max features) to tune over
 
-# we also use the default for bootstrap sample size, i.e nrow(X_train_final)
+# initialize storage for accuracy metrics
+results <- expand.grid(ntree = ntrees, mtry = max_features_range)
 
-# initialize performance storage
-train_acc <- test_acc <- oob_acc <- ncol(X_train_subset_final)
+dim(results)
 
-# tune random forest for max_features
-for (max_features in 1:ncol(X_train_subset_final)) { # setting this < ncol(X_train_subset_final for now, just to check if it runs)
-  
-    # fit the rf model using training data
-    rf <- randomForest(x = X_train_subset_final, y = factor(y_train_final), mtry = max_features, ntree = ntree)
+results$train_acc <- NA
+results$test_acc <- NA
+results$oob_acc <- NA
 
-    # use trained model to predict y with validation x
-    y_pred_val <- predict(rf, X_val_subset)
+# tune
+for (i in 1:nrow(results)) {
+  ntrees_i <- results$ntree[i]
+  mtry_i <- results$mtry[i]
 
-    # use trained model to predict y with training x
-    y_pred_train <- rf$predicted
-    
-    # compute OOB accuracy measure - OOB error rate
-    oob_acc[max_features] <- 1 - rf$err.rate[ntree, "OOB"]
+  # train rf model using training data and current iteration of mtry and ntree
+  rf <- randomForest(
+    x = X_train_subset_final,
+    y = factor(y_train_final),
+    mtry = mtry_i,
+    ntree = ntrees_i
+  )
 
-    # compute training accuracy
-    train_acc[max_features] <- mean(y_train_final == as.numeric(levels(y_pred_train)[y_pred_train]))
-    
-    # compute test (val) accuracy - key parameter of interest
-    test_acc[max_features] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
+  # use trained model to predict y in validation data
+  y_pred_val <- predict(rf, X_val_subset)
+ 
+  # get trained model predictions of y in training data
+  y_pred_train <- rf$predicted
+
+  # compute out of bag accuracy measure
+  results$oob_acc[i] <- 1 - rf$err.rate[ntrees_i, "OOB"]
+ 
+  # compute training accuracy measure
+  results$train_acc[i] <- mean(y_train_final == as.numeric(levels(y_pred_train)[y_pred_train]))
+ 
+  # compute "test" - validation - accuracy
+  results$test_acc[i] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
 }
 
-# identify best max_features in validation data
-m_star <- which.max(test_acc)
-cat("optimal mtry (max_features):", m_star, "\n")
+# identify the optimal parameters
+best_params <- results[which.max(results$test_acc), ]
+cat("Optimal ntree:", best_params$ntree, "\n")
+cat("Optimal mtry:", best_params$mtry, "\n")
 
-# plot accuracy metrics
-n_features <- length(train_acc) # Should be 15 based on initialization
-plot(seq_len(n_features), train_acc, type = 'l', main = 'Tuning mtry for Subset', 
-     ylab = 'Accuracy', xlab = 'Number of Features', col = 'blue')
-lines(seq_len(n_features), test_acc, col = 'red')
-lines(seq_len(n_features), oob_acc, lty = 2, col = 'green')
-legend('bottomright', legend = c('Train Accuracy', 'Validation Accuracy', 'OOB Accuracy'), 
+# Plot accuracy metrics for tuning mtry (max_features) at the optimal ntree
+plot(results$mtry[results$ntree == best_params$ntree], results$train_acc[results$ntree == best_params$ntree],
+     type = 'l', main = 'Tuning mtry for Optimal ntree',
+     ylab = 'Accuracy', xlab = 'Number of Features (mtry)', col = 'blue')
+lines(results$mtry[results$ntree == best_params$ntree], results$test_acc[results$ntree == best_params$ntree], col = 'red')
+lines(results$mtry[results$ntree == best_params$ntree], results$oob_acc[results$ntree == best_params$ntree], lty = 2, col = 'green')
+legend('bottomright', legend = c('Train Accuracy', 'Validation Accuracy', 'OOB Accuracy'),
        col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
 
-# train final random forest model with optimal m
-RFTuned <- randomForest(x = X_train_subset_final, y = factor(y_train_final), mtry = m_star, ntree = ntree)
+# given optimal parameters, train using training data to get tuned model
+RFTuned <- randomForest(
+  x = X_train_subset_final,
+  y = factor(y_train_final),
+  mtry = best_params$mtry,
+  ntree = best_params$ntree
+)
 
-# predict using tuned model and test x
+# using model trained with optimal parameters, predict with TEST data
 RFPred <- predict(RFTuned, newdata = X_test_subset)
 
-# compute fitted probabilities with tuned model and test x
+# compute associated relevant fitted probabilities
 RFProb <- predict(RFTuned, newdata = X_test_subset, type = "prob")
 
-# compute roc and auc for random forest
+# compute test roc and auc of tuned model
 RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1))
 RF_auc <- round(auc(RF_roc), 4)
 cat("Random Forest AUC (Subset):", RF_auc, "\n")
@@ -1359,8 +1318,7 @@ legend('bottomright',
        lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
 box()
 
-
-# generate confusion matrix
+# gen confusion matrix
 generate_cm(
   true = y_test,
   predicted = RFPred,
@@ -1368,10 +1326,6 @@ generate_cm(
 )
 
 ```
-
-## Tuning ntree
-
-if we have computation capacity
 
 ## Variable Importance
 
@@ -1385,7 +1339,7 @@ rf_importance_subset <- rf_importance_subset %>%
   arrange(desc(Scaled_Importance))
 
 # plot rf variable importance - top 20
-ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20), 
+ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20),
        aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
   geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
   coord_flip() +
@@ -1393,7 +1347,6 @@ ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20)
        x = "Variable",
        y = "Scaled Importance") +
   theme_minimal()
-
 ```
 
 Insert interpretation on importance
@@ -1403,3 +1356,5 @@ Relative to lasso etc.
 # Conclusion
 
 make a final graph here with the ROCs for each model on the same graph, or a table of AUCs for each model, to make it easier to compare rather than going back and looking at at separate graphs etc
+
+note limitations of our analysis, possible extensions
