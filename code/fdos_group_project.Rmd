@@ -341,6 +341,7 @@ sqf_data <- sqf_data %>%
     .cols = where(is.character) & !c("stop_location_x", "stop_location_y"),
     .fns = as.factor
   ))
+
 ```
 
 Next, we will make `suspect_height`, `suspect_weight`, and `suspect_reported_age` numeric keeping in mind the factor levels to ensure R converts them correctly. Then, we will address outliers in the data.
@@ -785,7 +786,6 @@ X_subset <- X[, !grepl("^(search|physical_force|.*eye_color)", colnames(X)) &
                  !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag",
                                      "other_weapon_flag", "weapon_found_flag", "other_contraband_flag")]
 
-colnames(X_subset)
 
 # perform train-test split
 train_index <- createDataPartition(y, p = 0.7, list = FALSE)
@@ -811,75 +811,73 @@ cat("Balance of y_test:\n")
 print(table(y_test))
 ```
 
-Now the data is prepared, we run the logistic regressions:
+Now the data is prepared, we want to specify the data we will use for our logit model. Our logit model will serve as a simple baseline model. 
+
+* To create the simple model we will drop variables that may have occurred after the stop was initiated (such as `frisked_flag`, `firearm_flag`, and `suspect_eye_color`), as it is unclear when these occurred in relation to the arrest.
+
+* We also drop variables that may lead to multicollinearity (`suspect_hair_color` as that may be closely related to race and `supervising_officer_rank` as that may be closely related to `issuing_officer_rank`). 
+
+* We also dropped `year2` because it is 2023 for all observations. 
 
 ```{r}
-# For logistic regression we need to convert X_train and X_test to a data.frame
-X_train_df <- as.data.frame(X_train)  
-X_train_subset_df <- as.data.frame(X_train_subset)
+# Set X_logit, removing unwanted columns based on the patterns
+X_logit <- X[, !grepl("^(suspected_crime_description|frisked_flag|firearm_flag|knife_cutter_flag|other_weapon_flag|weapon_found_flag|other_contraband_flag|physical_force|search_basis|suspect_eye_color|suspect_hair_color|supervising_officer_rank)", colnames(X)) & !colnames(X) %in% c("year2")]
+```
 
-X_test_df <- as.data.frame(X_test)
-X_test_subset_df <- as.data.frame(X_test_subset)  
+Now we set the training and testing split using the X_logit data and run our model. 
+```{r}
+# perform train-test split
+train_index <- createDataPartition(y, p = 0.7, list = FALSE)
+y_train <- y[train_index]
+y_test <- y[-train_index]
+X_train_logit <- X_logit[train_index, ]
+X_test_logit <- X_logit[-train_index, ]
 
+# print lengths and dimensions
+cat("Length of y_train:", length(y_train), "\n")
+cat("Length of y_test:", length(y_test), "\n")
+cat("Dimensions of X_train_logit:", dim(X_train_logit), "\n")
+cat("Dimensions of X_test_subset:", dim(X_test_logit), "\n")
+X_train_logit_df <- as.data.frame(X_train_logit)
+X_test_logit_df <- as.data.frame(X_test_logit)
 
-# run logit for first set of predictors
-logit_all <- glm(y_train ~ ., data = X_train_df, family = binomial(logit))
+#logit model 
+logit <- glm(y_train ~ ., data = X_train_logit_df, family = binomial(logit))
+predict_logit <- predict(logit, newdata = X_test_logit_df, type = "response")
 
-# run logit for subset of predictors
-logit_sub <- glm(y_train ~ ., data = X_train_subset_df, family = binomial(logit))
-
-# predict in test data
-predict_all <- predict(logit_all, newdata = X_test_df, type = "response")
-
-# predict in test data
-predict_sub <- predict(logit_sub, newdata = X_test_subset_df, type = "response")
-
-# Compute ROC and AUC for the model with all features
-roc_all <- roc(y_test, predict_all)
-auc_all <- round(auc(roc_all), 4)
-cat("AUC for the model with all features:", auc_all, "\n")
-
-# Compute ROC and AUC for the model with subset of features
-roc_sub <- roc(y_test, predict_sub)  
+roc_sub <- roc(y_test, predict_logit)  
 auc_sub <- round(auc(roc_sub), 4)  
-cat("AUC for the model with subset features:", auc_sub, "\n")
+cat("AUC for the logit model", auc_sub, "\n")
+
+```
+To see how our model performs, we will plot the ROC Curve and the confusion matrix for the logistic regression model. 
+```{r}
+# Compute ROC and AUC for the model with all features
+roc_logit <- roc(y_test, predict_logit)
+auc_logit <- round(auc(roc_logit), 4)
+cat("AUC for the logit model:", auc_logit, "\n")
 
 # Function to compute and plot combined ROC curves
-plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
   # Plot the full model ROC curve
-  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
+  plot(y = roc_logit$sensitivities, x = 1 - roc_logit$specificities, type = 'l',
        col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
-       main = 'ROC Curves for Logistic Regression Models')
- 
-  # Add the subset model ROC curve
-  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
- 
-  # Add random guess line
+       main = 'ROC Curve for Logistic Regression Model')
+  #add random guess line
   abline(a = 0, b = 1, lty = 2, col = 'gray')
- 
-  # Add grid
   grid()
- 
-  # Add legend
   legend('bottomright',
-         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
-                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
-                    'Random Guess'),
-         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
+       legend = c(sprintf("AUC: %.3f", auc_logit)),
+       lty = c(1, 1), lwd = 2, col = c('blue', 'gray'))
  
-  # Add bounding box
+  #Add bounding box
   box()
-}
-
-# Call the function to plot the combined ROC curves
-plot_combined_roc(roc_all, roc_sub, "Full Model", "Subset Model")
-
-# Define a function to generate and plot confusion matrix
+  
+  # Define a function to generate and plot confusion matrix
 generate_cm <- function(true, predicted, title) {
-  # Create a confusion matrix as a data frame
-  cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
-    group_by(Predicted) %>%
-    mutate(Predicted_pct = Freq / sum(Freq))
+   #Create a confusion matrix as a data frame
+   cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
+   group_by(Predicted) %>%
+   mutate(Predicted_pct = Freq / sum(Freq))
  
   # Print the confusion matrix
   print(cm)
@@ -895,18 +893,19 @@ generate_cm <- function(true, predicted, title) {
     theme_minimal()
  
   # Print the plot
-  print(plot)
-}
+  print(plot)}
 
 # convert probabilities to binary predictions using a threshold of 0.5
-predict_all_binary <- ifelse(predict_all > 0.5, 1, 0)
-predict_sub_binary <- ifelse(predict_sub > 0.5, 1, 0)
+predict_logit_binary <- ifelse(predict_logit > 0.5, 1, 0)
 
 # plot confusion matrix for logistic regression with all variables
-generate_cm(y_test, predict_all_binary, "Confusion Matrix for Logistic Regression (Full Model)")
+generate_cm(y_test, predict_logit_binary, "Confusion Matrix for Logistic Regression")
 
-# plot confusion matrix for logistic regression with subset of variables
-generate_cm(y_test, predict_sub_binary, "Confusion Matrix for Logistic Regression (Subset Model)")
+#Calculate mean squared error for both models
+mse_logit <- mean((predict_logit - y_test)^2)
+
+print(mse_logit)
+
 ```
 
 We now run penalised regressions; LASSO, Ridge and Elastic Net.
@@ -988,6 +987,8 @@ generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Mode
 # compute roc object for subset model
 lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset)
 
+plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) 
+  
 # plot combined roc curve for lasso models
 plot_combined_roc(lasso_roc_full, lasso_roc_subset, "Lasso Full", "Lasso Subset")
 ```
