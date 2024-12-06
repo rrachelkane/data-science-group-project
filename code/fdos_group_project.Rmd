@@ -1027,7 +1027,7 @@ en_opt_best_lambda_subset <- NULL
 # Iterate over alpha values
 for (alpha in alpha_values) {
   #Train Elastic Net model for the given alpha
-  en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en_subset, alpha = alpha, family = "binomial", type.measure = "class")
+  en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
   
   #Get the best lambda from cross-validation
   en_opt_lambda_min_subset <- en_opt_subset$lambda.min
@@ -1036,7 +1036,7 @@ for (alpha in alpha_values) {
   en_opt_y_prob_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_val_en_subset, type = "response")
   
   # Compute AUC
-  en_opt_auc_value_subset <- auc(response = y_val_en_subset, predictor = en_opt_y_prob_subset)
+  en_opt_auc_value_subset <- auc(response = y_val_en, predictor = en_opt_y_prob_subset)
   
   # Update best alpha if AUC improves
   if (en_opt_auc_value_subset > en_opt_best_auc_subset) {
@@ -1047,7 +1047,7 @@ for (alpha in alpha_values) {
 }
 
 en_opt_y_test_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_test_en_subset, type = "response")
-en_opt_best_auc_subset <- auc(response = y_test_en_subset, predictor = en_opt_y_test_subset)
+en_opt_best_auc_subset <- auc(response = y_test_en, predictor = en_opt_y_test_subset)
 
 # Output best alpha, lambda and its AUC
 cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda_subset))
