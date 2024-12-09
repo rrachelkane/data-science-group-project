@@ -752,18 +752,28 @@ ggplot() +
 
 ### Tract-Level Population Predictors
 
-Additionally, the `nycgeo` package allows us to link with neighbour tabulation area level American Community Survey (2013-2017) population statistics.
+Additionally, the `nycgeo` package allows us to link with census tract level American Community Survey (2013-2017) population statistics.
 
 **insert justification for why these - demographic stats of location of the stop - might be predictors of arrest **
 
 We visualize those here:
+```{r}
+# we first create the new variables in the shapefile for ease of plotting
+nyc_tract_shp <- nyc_tract_shp %>%
+  mutate(pc_pop_black_est = (pop_black_est / pop_total_est) * 100,
+         pc_pop_hisp_est = (pop_hisp_est / pop_total_est) * 100,
+         pc_pop_asian_est = (pop_asian_est / pop_total_est) * 100,
+         pc_pop_ba_above_est = (pop_ba_above_est / pop_total_est) * 100,
+         pc_pop_inpov_est = (pop_inpov_est / pop_total_est) * 100
+  )
+```
 
 ```{r}
 # non hispanic black
 ggplot(nyc_tract_shp) +
-  geom_sf(aes(fill = pop_black_est)) +
+  geom_sf(aes(fill = pc_pop_black_est)) +
   scale_fill_viridis_c(
-    name = "Non-Hispanic Black Population",
+    name = "Non-Hispanic Black % Total Population",
     option = "inferno"
   ) +
   theme_void() +
@@ -771,9 +781,9 @@ ggplot(nyc_tract_shp) +
 
 # hispanic any
 ggplot(nyc_tract_shp) +
-  geom_sf(aes(fill = pop_hisp_est)) +
+  geom_sf(aes(fill = pc_pop_hisp_est)) +
   scale_fill_viridis_c(
-    name = "Hispanic Any Race Population",
+    name = "Hispanic Any Race % Total Population",
     option = "inferno"
   ) +
   theme_void() +
@@ -781,9 +791,9 @@ ggplot(nyc_tract_shp) +
 
 # non
 ggplot(nyc_tract_shp) +
-  geom_sf(aes(fill = pop_asian_est)) +
+  geom_sf(aes(fill = pc_pop_asian_est)) +
   scale_fill_viridis_c(
-    name = "Non-hispanic Asian Population",
+    name = "Non-hispanic Asian % Total Population",
     option = "inferno"
   ) +
   theme_void() +
@@ -791,43 +801,53 @@ ggplot(nyc_tract_shp) +
 
 # pop age 25 years or older with at least bachelors degree
 ggplot(nyc_tract_shp) +
-  geom_sf(aes(fill = pop_ba_above_est)) +
+  geom_sf(aes(fill = pc_pop_ba_above_est)) +
   scale_fill_viridis_c(
-    name = "Population Aged >= 25 with at Least Bachelors Degree",
+    name = "% Population Aged >= 25 with at Least Bachelors Degree",
     option = "inferno"
   ) +
   theme_void() +
-  labs(title = "Population Aged >= 25 with at least a Bachelor's Degree by Census Tract, ACS 2013-2017")
+  labs(title = "% Population Aged >= 25 with at least a Bachelor's Degree by Census Tract, ACS 2013-2017")
 
 # income below pov
 # pop age 25 years or older with at least bachelors degree
 ggplot(nyc_tract_shp) +
-  geom_sf(aes(fill = pop_inpov_est)) +
+  geom_sf(aes(fill = pc_pop_inpov_est)) +
   scale_fill_viridis_c(
-    name = "Population With Income Below Poverty Line",
+    name = "% Population With Income Below Poverty Line",
     option = "inferno"
   ) +
   theme_void() +
-  labs(title = "Population with Income Below Poverty Line, ACS 2013-2017")
+  labs(title = "% Population with Income Below Poverty Line, ACS 2013-2017")
 ```
 
 We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
 
 ```{r}
+# now we create the new variables in the sqf_data_sf object, before merging as appropriate by stop_id into the original data
+sqf_data_sf <- sqf_data_sf %>%
+  mutate(pc_pop_black_est = (pop_black_est / pop_total_est) * 100,
+         pc_pop_hisp_est = (pop_hisp_est / pop_total_est) * 100,
+         pc_pop_asian_est = (pop_asian_est / pop_total_est) * 100,
+         pc_pop_ba_above_est = (pop_ba_above_est / pop_total_est) * 100,
+         pc_pop_inpov_est = (pop_inpov_est / pop_total_est) * 100
+  )
+
 # check current dim
 dim(sqf_data)
 
 sqf_data <- sqf_data %>%
   # left join selected spatial features from the sf object into sqf_data
-  left_join(sqf_data_sf %>% select(stop_id, pop_ba_above_est, pop_inpov_est, pop_asian_est, pop_hisp_est, pop_black_est), by = "stop_id") %>% 
+  left_join(sqf_data_sf %>% select(stop_id, pc_pop_ba_above_est, pc_pop_inpov_est, pc_pop_asian_est, pc_pop_hisp_est, pc_pop_black_est), by = "stop_id") %>%
   # drop x,y coords and geometry as we use census tract for spatial info
-  select(-c("stop_location_x", "stop_location_y", "geometry")) %>% 
+  select(-c("stop_location_x", "stop_location_y", "geometry")) %>%
   # drop obs with missing values in these spatial features
   filter(!if_any(everything(), is.na))
 
 # check new dim
 dim(sqf_data)
 ```
+
 
 # Regression Analysis
 
@@ -874,7 +894,7 @@ We create this subset below:
 
 ```{r}
 # set x subset, removing anything that is/might be realized during the stop
-X_subset <- X[, !grepl("^(search|physical_force|.*eye_color)", colnames(X)) &
+X_subset <- X[, !grepl("^(search|physical_force|.*eye_color|.*hair_color)", colnames(X)) &
                  !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag",
                                      "other_weapon_flag", "weapon_found_flag", "other_contraband_flag")]
 
