@@ -306,7 +306,7 @@ sqf_data <- sqf_data %>%
 print(unique(sqf_data$frisked_flag))
 ```
 
-## Other Column Cleaning
+## Feature Transformation/Engineering 
 
 We also bin the time of the stop from `stop_frisk_time`:
 
@@ -372,9 +372,10 @@ summary(sqf_data$suspect_reported_age)
 summary(sqf_data$suspect_height)
 summary(sqf_data$suspect_weight)
 ```
-## Feature Transformation 
-Before addressing outliers, we first need to transform the height variable as it is currently in the format of feet.inches. For example, an observation of 5.10 means 5 feet 10 inches and 5.1 means 5 feet 1 inch. We will transform the inches into feet so each observation is only in feet.
-Bear in mind, in the raw data we have values such as 5.90, which really means 5 feet 9 inches, not 5 feet 90 inches. To address this during the conversion, we checked to see if the inches amount had 1 or 2 decimals and handled accordingly. We also ensured all the inches amounts were in between 0 and 11.5 to ensure none were accidentally converted incorrectly. 
+
+Before addressing outliers in the three numerical features, we first need to transform the height variable as it is currently in the format of feet.inches. This creates an issue as an observation of 5.10 means 5 feet 10 inches, but 5.1 means 5 feet 1 inch. We will transform the inches into feet so each observation is only in feet.
+
+It should be noted that in the raw data we have values such as 5.90, which really means 5 feet 9 inches, not 5 feet 90 inches. To address this during the conversion, we checked to see if the inches amount had 1 or 2 decimals and handled accordingly. We also ensured all the inches amounts were in between 0 and 11.9 to ensure none were accidentally converted incorrectly. 
 ```{r}
 # Function to convert feet.inches to feet
 convert_to_feet <- function(feet_inches) {
@@ -405,9 +406,9 @@ convert_to_feet <- function(feet_inches) {
   }
   
   # Validate inches (should be between 0 and 11)
-  if (inches < 0 || inches > 11.5) {
-    warning(paste("Invalid height input:", feet_inches, "- Inches must be between 0 and 11.5. Returning NA."))
-    return(NA) # Return NA for invalid inputs
+  if (inches < 0 || inches > 11.9) {
+    warning(paste("Invalid height input:", feet_inches, "- Inches must be between 0 and 11.9. Returning NA."))
+    return(NA) # We have no NAs, so inches were extracted correctly. 
   }
   
   # Convert inches to feet
@@ -953,12 +954,9 @@ When looking at our confusion matrices, we choose $C=1$ and weight both types of
 
 Now the data is prepared, we want to specify the data we will use for our logit model. Our logit model will serve as a simple baseline model. 
 
-
-* To create the simple model we will drop variables that may have occurred after the stop was initiated (such as `frisked_flag`, `firearm_flag`, and `suspect_eye_color`), as it is unclear when these occurred in relation to the arrest.
+* To create the simple model we will drop variables related to search, frisk, and physical force following the `X_train_subset` conservative approach, as it is unclear if these occurred before or after arrests. 
 
 * We also drop variables that may lead to multicollinearity (`suspect_hair_color` as that may be closely related to race and `supervising_officer_rank` as that may be closely related to `issuing_officer_rank`). 
-
-* We also dropped `year2` because it is 2023 for all observations. 
 
 ```{r}
 # Set X_logit, removing unwanted columns based on the patterns
