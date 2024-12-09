@@ -825,6 +825,7 @@ X_logit <- X[, !grepl("^(suspected_crime_description|frisked_flag|firearm_flag|k
 ```
 
 Now we set the training and testing split using the X_logit data and run our model. 
+
 ```{r}
 # perform train-test split
 train_index <- createDataPartition(y, p = 0.7, list = FALSE)
@@ -848,29 +849,42 @@ predict_logit <- predict(logit, newdata = X_test_logit_df, type = "response")
 roc_sub <- roc(y_test, predict_logit)  
 auc_sub <- round(auc(roc_sub), 4)  
 cat("AUC for the logit model", auc_sub, "\n")
-
 ```
-To see how our model performs, we will plot the ROC Curve and the confusion matrix for the logistic regression model. 
+
+To see how our model performs, we will plot the ROC Curve and the confusion matrix for the logistic regression model.
+
 ```{r}
 # Compute ROC and AUC for the model with all features
 roc_logit <- roc(y_test, predict_logit)
 auc_logit <- round(auc(roc_logit), 4)
 cat("AUC for the logit model:", auc_logit, "\n")
 
-# Function to compute and plot combined ROC curves
-  # Plot the full model ROC curve
-  plot(y = roc_logit$sensitivities, x = 1 - roc_logit$specificities, type = 'l',
+# plot function combined
+plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
+  # plot the full model ROC curve
+  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
        col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
-       main = 'ROC Curve for Logistic Regression Model')
-  #add random guess line
-  abline(a = 0, b = 1, lty = 2, col = 'gray')
-  grid()
-  legend('bottomright',
-       legend = c(sprintf("AUC: %.3f", auc_logit)),
-       lty = c(1, 1), lwd = 2, col = c('blue', 'gray'))
+       main = 'ROC Curves for Logistic Regression Models')
  
-  #Add bounding box
+  # Add the subset model ROC curve
+  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
+ 
+  # Add random guess line
+  abline(a = 0, b = 1, lty = 2, col = 'gray')
+ 
+  # Add grid
+  grid()
+ 
+  # Add legend
+  legend('bottomright',
+         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
+                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
+                    'Random Guess'),
+         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
+ 
+  # Add bounding box
   box()
+}
   
   # Define a function to generate and plot confusion matrix
 generate_cm <- function(true, predicted, title) {
@@ -907,16 +921,14 @@ mse_logit <- mean((predict_logit - y_test)^2)
 print(mse_logit)
 
 ```
+
 We now run penalised regressions; LASSO, Ridge and Elastic Net.
+
+## LASSO
 
 We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
 
 As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
-
-##Cross-Validation Set Generations for Linear Shrinkage
-
-```{r}
-## LASSO
 
 **insert formula**
 
@@ -988,9 +1000,7 @@ generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Mode
 
 # compute roc object for subset model
 lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset)
-
-plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) 
-  
+   
 # plot combined roc curve for lasso models
 plot_combined_roc(lasso_roc_full, lasso_roc_subset, "Lasso Full", "Lasso Subset")
 ```
@@ -1040,6 +1050,10 @@ ridge_roc_full <- roc(response = y_test, predictor = ridge_predict)
 # run ridge regression on subset predictors
 ridge_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
 
+if (is.null(ridge_subset$lambda.min)) {
+  stop("Optimal lambda not found for Ridge Regression.")
+}
+
 ridge_lambda_min_subset <- ridge_subset$lambda.min
 cat("Optimal lambda for ridge (subset):", ridge_lambda_min_subset, "\n")
 
@@ -1073,187 +1087,9 @@ ridge_roc_subset <- roc(response = y_test, predictor = ridge_predict_subset)
 plot_combined_roc(ridge_roc_full, ridge_roc_subset, "Ridge Full", "Ridge Subset")
 ```
 
-## Elastic Net Estimator Optimisation
+## Tuned Elastic Net
 
-#Create 3-way data partition for a two-way parametre optimisation in elastic net estimator
-set.seed(2)
-
-#Split test data away from training and validation data
-train_val_en_index <- createDataPartition(y, p =0.8, list=FALSE)
-y_test_en <- y[-train_val_en_index]
-X_test_en <- X[-train_val_en_index, ]
-X_test_en_subset <- X_subset[-train_val_en_index, ]
-
-#Split training and validation data
-train_en_index <- createDataPartition(y[train_val_en_index], p=0.5, list=FALSE)
-y_train_en <- y[train_en_index]
-X_train_en <- X[train_en_index, ]
-X_train_en_subset <- X_subset[train_en_index, ]
-
-y_val_en <- y[-train_en_index]
-X_val_en <- X[-train_en_index, ]
-X_val_en_subset <- X_subset[-train_en_index, ]
-```
-# Elastic Net Full Regression
-* Insert Formula
-
-```{r}
-#Optimise elastic net over range of alphas
-
-alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
-# Initialize with the lowest possible values
-en_opt_best_alpha <- NULL
-en_opt_best_auc <- 0
-en_opt_best_lambda <- NULL
-
-# Iterate over alpha values
-for (alpha in alpha_values) {
-  #Train Elastic Net model for the given alpha
-  en_opt <- cv.glmnet(X_train_en, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
-  
-  #Get the best lambda from cross-validation
-  en_opt_lambda_min <- en_opt$lambda.min
-  
-  # Predict probabilities on the validation set - need to update with X_validate
-  en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_val_en, type = "response")
-  
-  # Compute AUC
-  en_opt_auc_value <- auc(response = y_val_en, predictor = en_opt_y_prob)
-  
-  # Update best alpha if AUC improves
-  if (en_opt_auc_value > en_opt_best_auc) {
-    en_opt_best_auc <- en_opt_auc_value
-    en_opt_best_alpha <- alpha
-    en_opt_best_lambda <- en_opt_lambda_min
-  }
-}
-
-en_opt_y_test <- predict(en_opt, s = en_opt_lambda_min, newx = X_test_en, type = "response")
-en_opt_best_auc <- auc(response = y_test_en, predictor = en_opt_y_test)
-
-# Output best alpha, lambda and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
-
-# Best alpha is stored in `en_opt_best_lambda` with lambda = `en_opt_best_lambda`
-en_opt <- cv.glmnet(X_train_en, y_train_en, alpha=en_opt_best_alpha, family="binomial", type.measure = "class")
-
-# plot misclassification error against log lambda
-plot(en_opt)
-title(main = "cross-validation misclassification error (elastic net)",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "misclassification error")
-
-# plot coefficients
-plot(en_opt$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "coefficient shrinkage path for elastic net",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "coefficients")
-
-# get fitted probabilities
-en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, X_test_en, type = "response")
-nrow(en_opt_predict)
-
-# add variable for predicted classes
-en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
-
-# plot confusion matrix for en regression out of sample
-generate_cm(y_test_en, en_opt_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
-
-# compute roc object for subset ridge model
-en_opt_roc_full <- roc(response = y_test_en, predictor = en_opt_predict)
-```
-
-## Elastic Net Sensitivity Analysis - Over Subset
-
-```{r}
-
-#Optimise elastic net over range of alphas
-
-# Recall alpha_values <- seq(0, 1, by = 0.01) 
-
-# Initialize with the lowest possible values
-en_opt_best_alpha_subset <- NULL
-en_opt_best_auc_subset <- 0
-en_opt_best_lambda_subset <- NULL
-
-# Iterate over alpha values
-for (alpha in alpha_values) {
-  #Train Elastic Net model for the given alpha
-  en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
-  
-  #Get the best lambda from cross-validation
-  en_opt_lambda_min_subset <- en_opt_subset$lambda.min
-  
-  # Predict probabilities on the validation set - need to update with X_validate
-  en_opt_y_prob_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_val_en_subset, type = "response")
-  
-  # Compute AUC
-  en_opt_auc_value_subset <- auc(response = y_val_en, predictor = en_opt_y_prob_subset)
-  
-  # Update best alpha if AUC improves
-  if (en_opt_auc_value_subset > en_opt_best_auc_subset) {
-    en_opt_best_auc_subset <- en_opt_auc_value_subset
-    en_opt_best_alpha_subset <- alpha
-    en_opt_best_lambda_subset <- en_opt_lambda_min
-  }
-}
-
-en_opt_y_test_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_test_en_subset, type = "response")
-en_opt_best_auc_subset <- auc(response = y_test_en, predictor = en_opt_y_test_subset)
-
-# Output best alpha, lambda and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda_subset))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha_subset))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc_subset))
-
-# Best alpha is stored in `en_opt_best_lambda_subset` with lambda in `en_opt_best_lambda_subset`
-
- en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en_subset, alpha = en_opt_best_alpha_subset, family = "binomial", type.measure = "class")
- 
-# plot misclassification error against log lambda for subset
-plot(en_opt_subset)
-title(main = "Cross-Validation Misclassification Error (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
-
-# plot coefficient shrinkage for subset
-plot(en_opt_subset$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# get fitted probabilities for subset
-en_opt_predict_subset <- predict(en_opt_subset, s = en_opt_best_lambda_subset, X_test_subset_en, type = "response")
-
-# add variable for predicted classes for subset
-en_opt_y_hat_subset <- ifelse(en_opt_predict_subset > 0.5, 1, 0)
-
-# plot confusion matrix for en_subset regression out of sample
-generate_cm(y_test_en, en_opt_y_hat_subset, "Confusion Matrix for Elastic Net (Subset Model)")
-
-# compute roc object for subset ridge model
-en_opt_roc_subset <- roc(response = y_test_en, predictor = en_predict_subset)
-
-# plot combined roc curve for ridge models
-plot_combined_roc(en_opt_roc_full, en_opt_roc_subset, "Elastic Net Full", "Elastic Net Subset")
-```
-## Variable Importance
-
-top 20 for logit, tuned shrinkage
-
-# Random Forest
-
-Next, we implement the random forest algorithm [justification].
-
-We do this on the subset of the data as [justification].
-
-We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as [elaborate here - mainly computational and want to just simplify the model].
+Now we implement elastic net regression, choosing to tune both $\lambda$ and $\alpha$ [insert justification].
 
 To do this, we split our current training data set into a training set and validation set.
 
@@ -1273,7 +1109,92 @@ cat("dimensions of X_train_final:", dim(X_train_subset_final), "\n")
 cat("dimensions of y_train_final:", length(y_train_final), "\n")
 cat("dimensions of X_val:", dim(X_val_subset), "\n")
 cat("dimensions of y_val:", length(y_val), "\n")
+```
 
+We tune elastic net in the subset of regressors [just subset here i dont think there is need to do full because then we just have to split more, and we are only doing subset for random forest anyway, takes too long]:
+
+```{r}
+# Initialize
+alpha_values <- seq(0, 1, by = 0.01)
+
+# Initialize with the lowest possible values
+en_opt_best_alpha <- NULL
+en_opt_best_auc <- 0
+en_opt_best_lambda <- NULL
+
+# Iterate over alpha values
+for (alpha in alpha_values) {
+  # Train Elastic Net model for the given alpha
+  en_opt <- cv.glmnet(X_train_subset_final, y_train_final, alpha = alpha, family = "binomial", type.measure = "class")
+  
+  # Get the best lambda from cross-validation
+  en_opt_lambda_min <- en_opt$lambda.min
+  
+  # Predict probabilities on the validation set
+  en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_val_subset, type = "response")
+  
+  # Compute AUC
+  en_opt_auc_value <- auc(response = y_val, predictor = en_opt_y_prob)
+  
+  # Update best alpha if AUC improves
+  if (en_opt_auc_value > en_opt_best_auc) {
+    en_opt_best_auc <- en_opt_auc_value
+    en_opt_best_alpha <- alpha
+    en_opt_best_lambda <- en_opt_lambda_min
+  }
+}
+
+# compute tuned auc
+en_opt_best_auc <- auc(response = y_test, predictor = en_opt_y_test)
+
+# Output best alpha, lambda, and its AUC
+cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
+cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
+cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
+
+# Train the Elastic Net model with the best alpha
+en_opt <- cv.glmnet(X_train_subset_final, y_train_final, alpha = en_opt_best_alpha, family = "binomial", type.measure = "class")
+
+# Plot misclassification error against log lambda for subset
+plot(en_opt)
+title(main = "Cross-Validation Misclassification Error (Elastic Net - Subset)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)",
+      ylab = "Misclassification Error")
+
+# Plot coefficient shrinkage for subset
+plot(en_opt$glmnet.fit, xvar = "lambda", label = TRUE)
+title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)",
+      ylab = "Coefficients")
+
+# Get fitted probabilities for subset
+en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, newx = X_test_subset, type = "response")
+
+# Add variable for predicted classes for subset
+en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
+
+# Plot confusion matrix for Elastic Net regression out of sample
+generate_cm(y_test, en_opt_y_hat, "Confusion Matrix for Elastic Net (Subset Model)")
+
+# Compute ROC object for subset ridge model
+en_opt_roc_subset <- roc(response = y_test, predictor = en_opt_predict)
+```
+
+## Variable Importance
+
+top 20 for logit, tuned shrinkage
+
+# Random Forest
+
+Next, we implement the random forest algorithm [justification].
+
+We do this on the subset of the data as [justification].
+
+We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as [elaborate here - mainly computational and want to just simplify the model].
+
+```{r}
 # Initialize parameter grid for grid search
 ntrees <- seq(50, 150, 50)  # range of trees to tune over
 max_features_range <- 1:20  # Range of mtry  (max features) to tune over
