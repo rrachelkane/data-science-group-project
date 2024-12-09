@@ -1144,13 +1144,6 @@ for (alpha in alpha_values) {
   }
 }
 
-# compute tuned auc
-en_opt_best_auc <- auc(response = y_test, predictor = en_opt_y_test)
-
-# Output best alpha, lambda, and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
 
 # Train the Elastic Net model with the best alpha
 en_opt <- cv.glmnet(X_train_subset_final, y_train_final, alpha = en_opt_best_alpha, family = "binomial", type.measure = "class")
@@ -1172,6 +1165,14 @@ title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
 # Get fitted probabilities for subset
 en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, newx = X_test_subset, type = "response")
 
+# compute tuned auc
+en_opt_best_auc <- auc(response = y_test, predictor = en_opt_predict)
+
+# Output best alpha, lambda, and its AUC
+cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
+cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
+cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
+
 # Add variable for predicted classes for subset
 en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
 
@@ -1180,6 +1181,8 @@ generate_cm(y_test, en_opt_y_hat, "Confusion Matrix for Elastic Net (Subset Mode
 
 # Compute ROC object for subset ridge model
 en_opt_roc_subset <- roc(response = y_test, predictor = en_opt_predict)
+
+# check this loop
 ```
 
 ## Variable Importance
