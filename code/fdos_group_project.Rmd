@@ -104,7 +104,7 @@ Next, we drop all columns which cannot be used for our prediction question, as t
 
 ```{r}
 sqf_data <- sqf_data %>% 
-  select(- c("stop_frisk_date", "record_status_code", "supervising_action_corresponding_activity_log_entry_reviewed", "stop_location_sector_code", "stop_location_apartment", "stop_location_full_address", "stop_location_patrol_boro_name", "stop_location_street_name", "suspect_other_description", "observed_duration_minutes", "stop_duration_minutes", "summons_issued_flag", "supervising_officer_command_code", "issuing_officer_command_code", "stop_location_precinct"))
+  select(- c("stop_frisk_date", "record_status_code", "supervising_action_corresponding_activity_log_entry_reviewed", "stop_location_sector_code", "stop_location_apartment", "stop_location_full_address", "stop_location_patrol_boro_name", "stop_location_street_name", "suspect_other_description", "observed_duration_minutes", "stop_duration_minutes", "summons_issued_flag", "supervising_officer_command_code", "issuing_officer_command_code", "stop_location_precinct", "year2", "suspect_arrest_offense"))
 
 # check new dim
 dim(sqf_data)
@@ -498,7 +498,7 @@ ggplot(sqf_data, aes(x = suspect_sex, fill = suspect_sex)) +
   labs(
     title = "Distribution of Suspect Sex", 
     x = "Sex", 
-    y = "Count"
+    y = "N Stops"
   ) +
   theme_minimal() +
   scale_fill_manual(
@@ -509,9 +509,9 @@ ggplot(sqf_data, aes(x = suspect_sex, fill = suspect_sex)) +
 # sex by arrest status
 ggplot(sqf_data, aes(x = suspect_sex, fill = factor(suspect_arrested_flag))) +
   geom_bar(position = "fill") +
-  labs(title = "Distribution of Suspect Sex", 
+  labs(title = "Distribution of Arrest Status, By Suspect Sex", 
        x = "Sex", 
-       y = "Count") +
+       y = "% Stops") +
   theme_minimal() +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_brewer(type = "qual", palette = "Pastel2", name = "Suspect Arrested") 
@@ -526,30 +526,15 @@ ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_f
   labs(x = "Suspect Reported Age", y = "ECDF", title = "Empirical CDF of Suspect Reported Age, By Sex and Arrest Status") +
   theme_minimal()
 
-# distribution of race
-ggplot(sqf_data, aes(x = suspect_race_description, fill = factor(suspect_race_description))) +
-  geom_bar() +
-  labs(
-    title = "Distribution of Suspect Race", 
-    x = "Race", 
-    y = "Count"
-  ) +
-  theme_minimal() +
-  scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  )
-
 # arrests by race, unstacked
 ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
   geom_bar() +
   coord_flip() +
   theme_minimal() +
   xlab("Suspect Race") +
-  ylab("N Observations") +
+  ylab("N Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Race")
+  labs(title = "Distribution of Arrest Status, By Suspect Race")
 
 # arrests by race, stacked
 ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
@@ -558,9 +543,9 @@ ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), f
   scale_y_continuous(labels = scales::percent) +
   theme_minimal() +
   xlab("Suspect Race") +
-  ylab("% Observations") +
+  ylab("% Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Race")
+  labs(title = "Distribution of Arrest Status, By Suspect Race")
 
 # arrests by suspected crime description, unstacked
 ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description)), fill = factor(suspect_arrested_flag))) +
@@ -568,9 +553,9 @@ ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description))
   coord_flip() +
   theme_minimal() +
   xlab("Suspected Crime") +
-  ylab("N Observations") +
+  ylab("N Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Suspected Crime")
+  labs(title = "Distribution of Arrest Status, By Suspected Crime")
 
 # arrests by suspected crime description, stacked
 ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspect_arrested_flag))) +
@@ -579,20 +564,59 @@ ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspe
   scale_y_continuous(labels = scales::percent) +
   theme_minimal() +
   xlab("Suspected Crime") +
-  ylab("% Observations") +
+  ylab("% Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
-  labs(title = "Suspect Arrested, By Suspected Crime")
+  labs(title = "Distribution of Arrest Status, By Suspect Crime")
 
+# heatmap of arrests by time of day and borough
+ggplot(
+  sqf_data %>%
+    group_by(stop_location_boro_name, time_of_day) %>%
+    summarise(
+      percent_arrested = mean(suspect_arrested_flag, na.rm = TRUE) * 100,
+      .groups = "drop"
+    ),
+  aes(
+    x = time_of_day,
+    y = stop_location_boro_name,
+    fill = percent_arrested
+  )
+) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Arrest Rate (%)") +
+  labs(
+    title = "Heat Map of Arrest Rates",
+    x = "Time of Day",
+    y = "Borough"
+  ) +
+  theme_minimal()
 
-# to be done:
-
-# borough of stop & arrests
-
-# time of day of stop & arrests
-
-# issuing officer rank & arrests
+# heatmap of arrests by issuing officer rank and suspect race
+ggplot(
+  sqf_data %>%
+    group_by(issuing_officer_rank, suspect_race_description) %>%
+    summarise(
+      percent_arrested = mean(suspect_arrested_flag, na.rm = TRUE) * 100,
+      .groups = "drop"
+    ),
+  aes(
+    x = issuing_officer_rank,
+    y = suspect_race_description,
+    fill = percent_arrested
+  )
+) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Arrest Rate (%)") +
+  labs(
+    title = "Heat Map of Arrest Rates",
+    x = "Officer in Uniform",
+    y = "Suspect Race"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
-
 
 ## Spatial Data Visualisation
 
@@ -749,43 +773,20 @@ dim(sqf_data)
 
 # Regression Analysis
 
-## Logistic Regression
+For our logistic and penalized regressions, we split our sample in two:
 
-We split our sample as [justify].
+* training data
+* test data
 
-For each model type, we estimate using two different matrices of predictors to test sensitivity of prediction accuracy:
-
-* the first drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was carried out **after** an arrest. As we are ultimately interested in predicting arrest status ex-ante to the stop from the police officer's perspective [edit]
-
-* the second matrix - subset - also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest [edit].
-
-The cost ratio is: $$C = \frac{L(1,0)}{L(0,1)}$$.
-
-This measures how costly false negatives are relative to false positives. The optimal decision is $$\hat{y_i} = 1 \iff p_i > {1 \over 1+C}$$
-
-We choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$.
-
-We evaluate all of our models based on their predictive performance:
-
-* in confusion matrices (in test data)
-* in ROC curves and associated AUCs (in test data)
-
-We also look at the variable importance between models.
+We perform this below:
 
 ```{r}
 # set seed for reproducibility
 set.seed(1)
 
-# set y and two predictor matrices (unsplit)
+# set y and X matrix
 y <- sqf_data$suspect_arrested_flag
-
-X <- model.matrix(~ . - suspect_arrested_flag - stop_id -search_basis_incidental_to_arrest_flag, data = sqf_data) #remove unique id
-
-# set x subset, removing anything that is/might be realized during the stop
-X_subset <- X[, !grepl("^(search|physical_force|.*eye_color)", colnames(X)) &
-                 !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag",
-                                     "other_weapon_flag", "weapon_found_flag", "other_contraband_flag")]
-
+X <- model.matrix(~ . - suspect_arrested_flag - stop_id -search_basis_incidental_to_arrest_flag, data = sqf_data)
 
 # perform train-test split
 train_index <- createDataPartition(y, p = 0.7, list = FALSE)
@@ -793,305 +794,56 @@ y_train <- y[train_index]
 y_test <- y[-train_index]
 X_train <- X[train_index,]
 X_test <- X[-train_index, ]
-X_train_subset <- X_subset[train_index, ]
-X_test_subset <- X_subset[-train_index, ]
 
 # print lengths and dimensions
 cat("Length of y_train:", length(y_train), "\n")
 cat("Length of y_test:", length(y_test), "\n")
 cat("Dimensions of X_train:", dim(X_train), "\n")
 cat("Dimensions of X_test:", dim(X_test), "\n")
-cat("Dimensions of X_train_subset:", dim(X_train_subset), "\n")
-cat("Dimensions of X_test_subset:", dim(X_test_subset), "\n")
 
 # check balance of y
-cat("Balance of y_train:\n")
 print(table(y_train))
-cat("Balance of y_test:\n")
 print(table(y_test))
 ```
 
-Now the data is prepared, we want to specify the data we will use for our logit model. Our logit model will serve as a simple baseline model. 
+Note that, for each model type, we estimate using two sets of matrices of predictors to test sensitivity of prediction accuracy:
 
-* To create the simple model we will drop variables that may have occurred after the stop was initiated (such as `frisked_flag`, `firearm_flag`, and `suspect_eye_color`), as it is unclear when these occurred in relation to the arrest.
+* the first (`X_train` and `X_test`) simply drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was carried out **after** an arrest. As we are ultimately interested in predicting arrest status ex-ante to the stop from the police officer's perspective [edit]
 
-* We also drop variables that may lead to multicollinearity (`suspect_hair_color` as that may be closely related to race and `supervising_officer_rank` as that may be closely related to `issuing_officer_rank`). 
+* the second set (`X_train_subset` and `X_test_subset`) also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest [edit].
 
-* We also dropped `year2` because it is 2023 for all observations. 
-
-```{r}
-# Set X_logit, removing unwanted columns based on the patterns
-X_logit <- X[, !grepl("^(suspected_crime_description|frisked_flag|firearm_flag|knife_cutter_flag|other_weapon_flag|weapon_found_flag|other_contraband_flag|physical_force|search_basis|suspect_eye_color|suspect_hair_color|supervising_officer_rank)", colnames(X)) & !colnames(X) %in% c("year2")]
-```
-
-Now we set the training and testing split using the X_logit data and run our model. 
+We create this subset below:
 
 ```{r}
+# set x subset, removing anything that is/might be realized during the stop
+X_subset <- X[, !grepl("^(search|physical_force|.*eye_color)", colnames(X)) &
+                 !colnames(X) %in% c("frisked_flag", "firearm_flag", "knife_cutter_flag",
+                                     "other_weapon_flag", "weapon_found_flag", "other_contraband_flag")]
+
+
 # perform train-test split
-train_index <- createDataPartition(y, p = 0.7, list = FALSE)
-y_train <- y[train_index]
-y_test <- y[-train_index]
-X_train_logit <- X_logit[train_index, ]
-X_test_logit <- X_logit[-train_index, ]
+X_train_subset <- X_subset[train_index, ]
+X_test_subset <- X_subset[-train_index, ]
 
-# print lengths and dimensions
-cat("Length of y_train:", length(y_train), "\n")
-cat("Length of y_test:", length(y_test), "\n")
-cat("Dimensions of X_train_logit:", dim(X_train_logit), "\n")
-cat("Dimensions of X_test_subset:", dim(X_test_logit), "\n")
-X_train_logit_df <- as.data.frame(X_train_logit)
-X_test_logit_df <- as.data.frame(X_test_logit)
-
-#logit model 
-logit <- glm(y_train ~ ., data = X_train_logit_df, family = binomial(logit))
-predict_logit <- predict(logit, newdata = X_test_logit_df, type = "response")
-
-roc_sub <- roc(y_test, predict_logit)  
-auc_sub <- round(auc(roc_sub), 4)  
-cat("AUC for the logit model", auc_sub, "\n")
+cat("Dimensions of X_train_subset:", dim(X_train_subset), "\n")
+cat("Dimensions of X_test_subset:", dim(X_test_subset), "\n")
 ```
 
-To see how our model performs, we will plot the ROC Curve and the confusion matrix for the logistic regression model.
+Next, note that we also require a **validation** dataset for our tuning of hyperparameters in our tuned elastic net and random forest models.
 
-```{r}
-# Compute ROC and AUC for the model with all features
-roc_logit <- roc(y_test, predict_logit)
-auc_logit <- round(auc(roc_logit), 4)
-cat("AUC for the logit model:", auc_logit, "\n")
+For this reason, we split `X_train_subset` further into:
 
-# plot function combined
-plot_combined_roc <- function(full_roc, subset_roc, full_label, subset_label) {
-  # plot the full model ROC curve
-  plot(y = full_roc$sensitivities, x = 1 - full_roc$specificities, type = 'l',
-       col = 'blue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
-       main = 'ROC Curves for Logistic Regression Models')
- 
-  # Add the subset model ROC curve
-  lines(y = subset_roc$sensitivities, x = 1 - subset_roc$specificities, col = 'green', lwd = 2)
- 
-  # Add random guess line
-  abline(a = 0, b = 1, lty = 2, col = 'gray')
- 
-  # Add grid
-  grid()
- 
-  # Add legend
-  legend('bottomright',
-         legend = c(sprintf("%s AUC: %.3f", full_label, auc(full_roc)),
-                    sprintf("%s AUC: %.3f", subset_label, auc(subset_roc)),
-                    'Random Guess'),
-         lty = c(1, 1, 2), lwd = 2, col = c('blue', 'green', 'gray'))
- 
-  # Add bounding box
-  box()
-}
-  
-  # Define a function to generate and plot confusion matrix
-generate_cm <- function(true, predicted, title) {
-   #Create a confusion matrix as a data frame
-   cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
-   group_by(Predicted) %>%
-   mutate(Predicted_pct = Freq / sum(Freq))
- 
-  # Print the confusion matrix
-  print(cm)
- 
-  # Plot the confusion matrix
-  plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
-    geom_tile() +
-    geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
-    scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
-    xlab("True") +
-    ylab("Predicted") +
-    labs(title = title) +
-    theme_minimal()
- 
-  # Print the plot
-  print(plot)}
+* `X_train_subset_final`
+* `X_val_subset`
 
-# convert probabilities to binary predictions using a threshold of 0.5
-predict_logit_binary <- ifelse(predict_logit > 0.5, 1, 0)
+and correspondingly, `y_train` further into:
 
-# plot confusion matrix for logistic regression with all variables
-generate_cm(y_test, predict_logit_binary, "Confusion Matrix for Logistic Regression")
+* `y_train_final`
+* `y_val`
 
-#Calculate mean squared error for both models
-mse_logit <- mean((predict_logit - y_test)^2)
+We only do these for the subset, as we only tune these models for the subset for computational reasons.^[Run time increases significantly if we tune elastic net and random forest for the full set of predictors and the subset of predictors.]
 
-print(mse_logit)
-
-```
-
-We now run penalised regressions; LASSO, Ridge and Elastic Net.
-
-## LASSO
-
-We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
-
-As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
-
-**insert formula**
-
-```{r}
-# run lasso on training data to collect coefficients
-lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "class")
-
-# optimal lambda
-lasso_lambda_min <- lasso$lambda.min
-cat("Optimal Lambda for Lasso:", lasso_lambda_min, "\n")
-
-# plot misclassification error against log lambda
-plot(lasso)
-title(main = "Cross-Validation Misclassification Error",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
-
-# plot coefficients
-plot(lasso$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path for LASSO",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# get fitted probabilities, using best lambda
-lasso_predict <- predict(lasso, s = lasso_lambda_min, X_test, type = "response")
-
-# add variable for predicted classes
-lasso_y_hat <- ifelse(lasso_predict > 0.5, 1, 0)
-
-# plot confusion matrix for lasso regression out of sample
-generate_cm(y_test, lasso_y_hat, "Confusion Matrix for LASSO (Full Model)")
-
-# compute ROC
-lasso_roc_full <- roc(response = y_test, predictor = lasso_predict)
-```
-
-### LASSO Sensitivity Analysis - Subset
-
-```{r}
-# run lasso on training data to collect coefficients
-lasso_subset <- cv.glmnet(x=X_train_subset, y=y_train, alpha = 1, family="binomial", type.measure = "class")
-
-lasso_lambda_min_subset <- lasso_subset$lambda.min
-
-# plot misclassification error against log lambda
-plot(lasso_subset)
-title(main = "Cross-Validation Misclassification Error",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
-
-# plot coefficients
-plot(lasso_subset$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path for LASSO",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# get fitted probabilities
-lasso_predict_subset <- predict(lasso_subset, s = lasso_lambda_min_subset, X_test_subset, type = "response")
-
-# add variable for predicted classes
-lasso_y_hat_subset <- ifelse(lasso_predict_subset > 0.5, 1, 0)
-
-# plot confusion matrix for lasso subset regression out of sample
-generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Model)")
-
-# compute roc object for subset model
-lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset)
-   
-# plot combined roc curve for lasso models
-plot_combined_roc(lasso_roc_full, lasso_roc_subset, "Lasso Full", "Lasso Subset")
-```
-
-## Ridge
-
-**insert formula**
-
-```{r}
-# run ridge regression on training data to collect coefficients
-ridge <- cv.glmnet(x = X_train, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
-
-ridge_lambda_min <- ridge$lambda.min
-cat("optimal lambda for ridge:", ridge_lambda_min, "\n")
-
-# plot misclassification error against log lambda
-plot(ridge)
-title(main = "cross-validation misclassification error (ridge)",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "misclassification error")
-
-# plot coefficients
-plot(ridge$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "coefficient shrinkage path for ridge",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "coefficients")
-
-# get fitted probabilities
-ridge_predict <- predict(ridge, s = ridge_lambda_min, X_test, type = "response")
-nrow(ridge_predict)
-
-# add variable for predicted classes
-ridge_y_hat <- ifelse(ridge_predict > 0.5, 1, 0)
-
-# plot confusion matrix for ridge regression out of sample
-generate_cm(y_test, ridge_y_hat, "Confusion Matrix for Ridge (Full Model)")
-
-# compute roc object for full ridge model
-ridge_roc_full <- roc(response = y_test, predictor = ridge_predict)
-```
-
-### Ridge Sensitivity Analysis - Subset
-
-```{r}
-# run ridge regression on subset predictors
-ridge_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
-
-if (is.null(ridge_subset$lambda.min)) {
-  stop("Optimal lambda not found for Ridge Regression.")
-}
-
-ridge_lambda_min_subset <- ridge_subset$lambda.min
-cat("Optimal lambda for ridge (subset):", ridge_lambda_min_subset, "\n")
-
-# plot misclassification error against log lambda
-plot(ridge_subset)
-title(main = "Cross-Validation Misclassification Error (Ridge - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
-
-# plot coefficients
-plot(ridge_subset$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path for Ridge (Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# get fitted probabilities
-ridge_predict_subset <- predict(ridge_subset, s = ridge_lambda_min_subset, X_test_subset, type = "response")
-
-# add variable for predicted classes
-ridge_y_hat_subset <- ifelse(ridge_predict_subset > 0.5, 1, 0)
-
-# plot confusion matrix for ridge subset regression out of sample
-generate_cm(y_test, ridge_y_hat_subset, "Confusion Matrix for Ridge (Subset Model)")
-
-# compute roc object for subset ridge model
-ridge_roc_subset <- roc(response = y_test, predictor = ridge_predict_subset)
-
-# plot combined roc curve for ridge models
-plot_combined_roc(ridge_roc_full, ridge_roc_subset, "Ridge Full", "Ridge Subset")
-```
-
-## Tuned Elastic Net
-
-Now we implement elastic net regression, choosing to tune both $\lambda$ and $\alpha$ [insert justification].
-
-To do this, we split our current training data set into a training set and validation set.
+We create these matrices here:
 
 ```{r}
 # subset training data for validation split
@@ -1111,85 +863,316 @@ cat("dimensions of X_val:", dim(X_val_subset), "\n")
 cat("dimensions of y_val:", length(y_val), "\n")
 ```
 
+We now proceed by running our regression models, evaluating each of them based on their predictive performance in the test data.
+
+Note that as we are working in a binary classification setting, we are looking to minimize misclassification error. The cost ratio in this framework is: $$C = \frac{L(1,0)}{L(0,1)}$$.
+
+This measures how costly false negatives are relative to false positives. The optimal decision is $$\hat{y_i} = 1 \iff p_i > {1 \over 1+C}$$
+
+When looking at our confusion matrices, we choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$.
+
+## Logistic Regression
+
+Now the data is prepared, we want to specify the data we will use for our logit model. Our logit model will serve as a simple baseline model. 
+
+
+* To create the simple model we will drop variables that may have occurred after the stop was initiated (such as `frisked_flag`, `firearm_flag`, and `suspect_eye_color`), as it is unclear when these occurred in relation to the arrest.
+
+* We also drop variables that may lead to multicollinearity (`suspect_hair_color` as that may be closely related to race and `supervising_officer_rank` as that may be closely related to `issuing_officer_rank`). 
+
+* We also dropped `year2` because it is 2023 for all observations. 
+
+```{r}
+# Set X_logit, removing unwanted columns based on the patterns
+X_logit <- X[, !grepl("^(suspected_crime_description|frisked_flag|firearm_flag|knife_cutter_flag|other_weapon_flag|weapon_found_flag|other_contraband_flag|physical_force|search_basis|suspect_eye_color|suspect_hair_color|supervising_officer_rank)", colnames(X))]
+```
+
+Now we set the training and testing split using the X_logit data and run our model. 
+
+```{r}
+# perform train-test split on X_logit
+X_train_logit <- X_logit[train_index, ]
+X_test_logit <- X_logit[-train_index, ]
+
+# print lengths and dimensions
+cat("Dimensions of X_train_logit:", dim(X_train_logit), "\n")
+cat("Dimensions of X_test_subset:", dim(X_test_logit), "\n")
+
+# glm requires dataframes as arguments
+X_train_logit_df <- as.data.frame(X_train_logit)
+X_test_logit_df <- as.data.frame(X_test_logit)
+
+# full logit model in training data
+logit <- glm(y_train ~ ., data = X_train_logit_df, family = binomial(logit))
+
+# get fitted probabilities using trained model on test data
+logit_predict <- as.numeric(predict(logit, newdata = X_test_logit_df, type = "response"))
+
+# convert probabilities to class predictions using a threshold of 0.5
+logit_y_hat <- ifelse(logit_predict > 0.5, 1, 0)
+
+# inspect class balance of predicted classes
+table(logit_y_hat)  
+
+# define a function to generate and plot confusion matrix
+generate_cm <- function(true, predicted, title) {
+   # gen confusion matrix as a data frame
+   cm <- as.data.frame(table(True = true, Predicted = predicted)) %>%
+   group_by(Predicted) %>%
+   mutate(Predicted_pct = Freq / sum(Freq))
+ 
+  # print cm
+  print(cm)
+ 
+  # plot cm
+  plot <- ggplot(data = cm, mapping = aes(x = ordered(True, c(1, 0)), y = Predicted, fill = Predicted_pct)) +
+    geom_tile() +
+    geom_text(aes(label = round(Predicted_pct, 2)), color = 'white') +
+    scale_fill_gradient(low = "blue", high = "red", name = "Rel. Freq.") +
+    xlab("True") +
+    ylab("Predicted") +
+    labs(title = title) +
+    theme_minimal()
+ 
+  # print plot
+  print(plot)
+  
+}
+
+# plot confusion matrix for logistic regression with all variables
+generate_cm(y_test, logit_y_hat, "Confusion Matrix for Logistic Regression")
+
+# compute ROC and AUC
+logit_roc <- roc(response = y_test, predictor = logit_predict, quiet = TRUE)  
+logit_auc <- round(auc(logit_roc), 4)  
+cat("AUC for the logit model", logit_auc, "\n")
+```
+
+## LASSO
+
+Next we implement LASSO, where: $$ \beta^{LASSO} = \arg\min_{\beta} \sum_{i=1}^n\Big( y_i - x_i' \beta \Big)^2$$
+subject to  $$  \sum_{j=1}^{p} |\beta_j| < t $$
+
+We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
+
+As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
+
+```{r}
+# run lasso on training data to collect coefficients
+lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "class")
+
+# optimal lambda
+lasso_lambda_min <- lasso$lambda.min
+cat("Optimal Lambda for Lasso:", lasso_lambda_min, "\n")
+
+# plot misclassification error against log lambda
+plot(lasso)
+abline(v = log(lasso_lambda_min), col = "red", lwd = 2, lty = 2)
+title(main = "Cross-Validation Misclassification Error (LASSO - Full)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+
+# plot coefficients
+plot(lasso$glmnet.fit, xvar = "lambda", label = TRUE)
+title(main = "Coefficient Shrinkage Path for LASSO (Full Model)",
+      xlab = "Log(Lambda)", ylab = "Coefficients")
+
+# get fitted probabilities, using best lambda
+lasso_predict <- as.numeric(predict(lasso, s = lasso_lambda_min, X_test, type = "response"))
+
+# add variable for predicted classes
+lasso_y_hat <- ifelse(lasso_predict > 0.5, 1, 0)
+
+# plot confusion matrix for lasso regression out of sample
+generate_cm(y_test, lasso_y_hat, "Confusion Matrix for LASSO (Full Model)")
+
+# compute ROC and AUC
+lasso_roc_full <- roc(response = y_test, predictor = lasso_predict, quiet = TRUE)
+lasso_auc_full <- round(auc(lasso_roc_full), 4)  
+cat("AUC for the LASSO (full) model", lasso_auc_full, "\n")
+```
+
+### LASSO Sensitivity Analysis - Subset
+
+```{r}
+# run lasso on training data to collect coefficients
+lasso_subset <- cv.glmnet(x=X_train_subset, y=y_train, alpha = 1, family="binomial", type.measure = "class")
+
+lasso_lambda_min_subset <- lasso_subset$lambda.min
+
+# plot misclassification error against log lambda
+plot(lasso_subset)
+abline(v = log(lasso_lambda_min_subset), col = "red", lwd = 2, lty = 2)
+title(main = "Cross-Validation Misclassification Error (LASSO - Subset)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+
+# plot coefficients
+plot(lasso_subset$glmnet.fit, xvar = "lambda", label = TRUE)
+title(main = "Coefficient Shrinkage Path for LASSO (Subset)",
+      xlab = "Log(Lambda)", ylab = "Coefficients")
+
+# get fitted probabilities
+lasso_predict_subset <- as.numeric(predict(lasso_subset, s = lasso_lambda_min_subset, X_test_subset, type = "response"))
+
+# add variable for predicted classes
+lasso_y_hat_subset <- ifelse(lasso_predict_subset > 0.5, 1, 0)
+
+# plot confusion matrix for lasso subset regression out of sample
+generate_cm(y_test, lasso_y_hat_subset, "Confusion Matrix for LASSO (Subset Model)")
+
+# compute roc object for subset model
+lasso_roc_subset <- roc(response = y_test, predictor = lasso_predict_subset, quiet = TRUE)
+lasso_auc_subset <- round(auc(lasso_roc_subset), 4)  
+cat("AUC for the LASSO (subset) model", lasso_auc_subset, "\n")
+```
+
+## Ridge
+
+Next, we implement ridge regression: $$ \beta^{Ridge} = \arg\min_{\beta} \sum_{i=1}^n\Big( y_i - x_i' \beta \Big)^2$$
+subject to  $$  \sum_{j=1}^{p} \beta_j^2 < t $$.
+```{r}
+# run ridge regression on training data to collect coefficients
+ridge <- cv.glmnet(x = X_train, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
+
+ridge_lambda_min <- ridge$lambda.min
+cat("optimal lambda for ridge:", ridge_lambda_min, "\n")
+
+# plot misclassification error against log lambda
+plot(ridge)
+abline(v = log(ridge_lambda_min), col = "red", lwd = 2, lty = 2)
+title(main = "Cross-Validation Misclassification Error (Ridge - Full)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+
+# plot coefficients
+plot(ridge$glmnet.fit, xvar = "lambda", label = TRUE)
+title(main = "Coefficient Shrinkage Path for Ridge (Full Model)",
+      xlab = "Log(Lambda)", ylab = "Coefficients")
+
+# get fitted probabilities
+ridge_predict <- as.numeric(predict(ridge, s = ridge_lambda_min, X_test, type = "response"))
+
+# add variable for predicted classes
+ridge_y_hat <- ifelse(ridge_predict > 0.5, 1, 0)
+
+# plot confusion matrix for ridge regression out of sample
+generate_cm(y_test, ridge_y_hat, "Confusion Matrix for Ridge (Full Model)")
+
+# compute roc object for full ridge model
+ridge_roc_full <- roc(response = y_test, predictor = ridge_predict, quiet = TRUE)
+ridge_auc_full <- round(auc(ridge_roc_full), 4)
+cat("AUC for the Ridge (full) model:", ridge_auc_full, "\n")
+```
+
+### Ridge Sensitivity Analysis - Subset
+
+```{r}
+# run ridge regression on subset predictors
+ridge_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
+
+ridge_lambda_min_subset <- ridge_subset$lambda.min
+cat("Optimal lambda for ridge (subset):", ridge_lambda_min_subset, "\n")
+
+# plot misclassification error against log lambda
+plot(ridge_subset)
+abline(v = log(ridge_lambda_min_subset), col = "red", lwd = 2, lty = 2)
+title(main = "Cross-Validation Misclassification Error (Ridge - Subset)",
+      sub = "Optimal Lambda Highlighted in Red",
+      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+
+# plot coefficients
+plot(ridge_subset$glmnet.fit, xvar = "lambda", label = TRUE)
+title(main = "Coefficient Shrinkage Path for Ridge (Subset)",
+      xlab = "Log(Lambda)", ylab = "Coefficients")
+
+# get fitted probabilities
+ridge_predict_subset <- as.numeric(predict(ridge_subset, s = ridge_lambda_min_subset, X_test_subset, type = "response"))
+
+# add variable for predicted classes
+ridge_y_hat_subset <- ifelse(ridge_predict_subset > 0.5, 1, 0)
+
+# plot confusion matrix for ridge subset regression out of sample
+generate_cm(y_test, ridge_y_hat_subset, "Confusion Matrix for Ridge (Subset Model)")
+
+# compute roc object for subset ridge model
+ridge_roc_subset <- roc(response = y_test, predictor = ridge_predict_subset, quiet = TRUE)
+ridge_auc_subset <- round(auc(ridge_roc_subset), 4)
+cat("AUC for the Ridge (subset) model:", ridge_auc_subset, "\n")
+```
+
+## Tuned Elastic Net
+
+Now we implement elastic net regression, choosing to tune both $\lambda$ and $\alpha$ [insert justification]. For this, we use our validation data, as mentioned.
+
 We tune elastic net in the subset of regressors [just subset here i dont think there is need to do full because then we just have to split more, and we are only doing subset for random forest anyway, takes too long]:
 
 ```{r}
-# Initialize
-alpha_values <- seq(0, 1, by = 0.01)
+# Define alpha values for grid search
+alpha_values <- seq(0, 1, by = 0.1) 
 
-# Initialize with the lowest possible values
-en_opt_best_alpha <- NULL
-en_opt_best_auc <- 0
-en_opt_best_lambda <- NULL
+# Initialize storage for results
+results <- data.frame(alpha = alpha_values, auc = NA, optimal_lambda = NA)
 
-# Iterate over alpha values
-for (alpha in alpha_values) {
-  # Train Elastic Net model for the given alpha
-  en_opt <- cv.glmnet(X_train_subset_final, y_train_final, alpha = alpha, family = "binomial", type.measure = "class")
+# loop grid search
+for (i in 1:nrow(results)) {
+  alpha_i <- results$alpha[i]
   
-  # Get the best lambda from cross-validation
+  # train en model with cross-validation for the given alpha
+  en_opt <- cv.glmnet(
+    x = X_train_subset_final,
+    y = y_train_final,
+    alpha = alpha_i,
+    family = "binomial",
+    type.measure = "class"
+  )
+  
+  # get the best lambda for the current alpha
   en_opt_lambda_min <- en_opt$lambda.min
   
-  # Predict probabilities on the validation set
-  en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_val_subset, type = "response")
+  # get fitted probabilities on the validation set using the best lambda and current alpha
+  en_opt_predict_val <- as.numeric(predict(en_opt, s = en_opt_lambda_min, newx = X_val_subset, type = "response"))
   
-  # Compute AUC
-  en_opt_auc_value <- auc(response = y_val, predictor = en_opt_y_prob)
+  # compute roc and aucs of trained model in validation data
+  en_opt_roc_val <- roc(response = as.numeric(y_val), predictor = en_opt_predict_val, quiet = TRUE)
+  en_opt_auc_val <- auc(en_opt_roc_val)
   
-  # Update best alpha if AUC improves
-  if (en_opt_auc_value > en_opt_best_auc) {
-    en_opt_best_auc <- en_opt_auc_value
-    en_opt_best_alpha <- alpha
-    en_opt_best_lambda <- en_opt_lambda_min
-  }
+  # add to storage vector
+  results$auc[i] <- en_opt_auc_val
+  results$optimal_lambda[i] <- en_opt_lambda_min
 }
 
+# identify the best alpha
+best_params <- results[which.max(results$auc), ]
+cat("Optimal alpha:", best_params$alpha, "\n")
+cat("Optimal lambda:", best_params$optimal_lambda, "\n")
+cat("Best AUC:", best_params$auc, "\n")
 
-# Train the Elastic Net model with the best alpha
-en_opt <- cv.glmnet(X_train_subset_final, y_train_final, alpha = en_opt_best_alpha, family = "binomial", type.measure = "class")
+# train the tuned elastic net model with best hyperparameters
+en_opt <- glmnet(
+  x = X_train_subset_final,
+  y = y_train_final,
+  alpha = best_params$alpha,
+  lambda = best_params$optimal_lambda,
+  family = "binomial"
+)
 
-# Plot misclassification error against log lambda for subset
-plot(en_opt)
-title(main = "Cross-Validation Misclassification Error (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
+# get fitted probabilities using trained model on test data
+en_opt_predict <- as.numeric(predict(en_opt, s = best_params$optimal_lambda, newx = X_test_subset, type = "response"))
 
-# Plot coefficient shrinkage for subset
-plot(en_opt$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# Get fitted probabilities for subset
-en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, newx = X_test_subset, type = "response")
-
-# compute tuned auc
-en_opt_best_auc <- auc(response = y_test, predictor = en_opt_predict)
-
-# Output best alpha, lambda, and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
-
-# Add variable for predicted classes for subset
+# add variable for predicted classes
 en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
 
-# Plot confusion matrix for Elastic Net regression out of sample
+# plot confusion matrix for tuned elastic net regression out of sample
 generate_cm(y_test, en_opt_y_hat, "Confusion Matrix for Elastic Net (Subset Model)")
 
-# Compute ROC object for subset ridge model
-en_opt_roc_subset <- roc(response = y_test, predictor = en_opt_predict)
-
-# check this loop
+# compute test ROC and AUC out of sample
+en_opt_roc_subset <- roc(response = as.numeric(y_test), predictor = en_opt_predict, quiet = TRUE)
+en_opt_auc_subset <- auc(en_opt_roc_subset)
+cat("Test AUC for Tuned Elastic Net model:", en_opt_auc_subset, "\n")
 ```
 
-## Variable Importance
-
-top 20 for logit, tuned shrinkage
-
-# Random Forest
+## Random Forest
 
 Next, we implement the random forest algorithm [justification].
 
@@ -1245,14 +1228,23 @@ best_params <- results[which.max(results$test_acc), ]
 cat("Optimal ntree:", best_params$ntree, "\n")
 cat("Optimal mtry:", best_params$mtry, "\n")
 
-# Plot accuracy metrics for tuning mtry (max_features) at the optimal ntree
-plot(results$mtry[results$ntree == best_params$ntree], results$train_acc[results$ntree == best_params$ntree],
-     type = 'l', main = 'Tuning mtry for Optimal ntree',
-     ylab = 'Accuracy', xlab = 'Number of Features (mtry)', col = 'blue')
-lines(results$mtry[results$ntree == best_params$ntree], results$test_acc[results$ntree == best_params$ntree], col = 'red')
-lines(results$mtry[results$ntree == best_params$ntree], results$oob_acc[results$ntree == best_params$ntree], lty = 2, col = 'green')
-legend('bottomright', legend = c('Train Accuracy', 'Validation Accuracy', 'OOB Accuracy'),
+# define accuracy metrics and y-axis range for tuning plot
+accuracy_metrics <- results[results$ntree == best_params$ntree, ]
+y_range <- range(c(accuracy_metrics$train_acc, accuracy_metrics$test_acc, accuracy_metrics$oob_acc)) + c(-0.01, 0.01)
+
+# plot train, validation, and OOB accuracy for optimal ntree as mtry varies
+plot(
+  accuracy_metrics$mtry, accuracy_metrics$train_acc, 
+  type = 'l', col = 'blue', ylim = y_range,
+  main = 'Tuning mtry for Optimal ntree',
+  xlab = 'Number of Features (mtry)', ylab = 'Accuracy'
+)
+lines(accuracy_metrics$mtry, accuracy_metrics$test_acc, col = 'red')
+lines(accuracy_metrics$mtry, accuracy_metrics$oob_acc, col = 'green', lty = 2)
+legend('bottomright', 
+       legend = c('Train Accuracy', 'Validation Accuracy', 'OOB Accuracy'),
        col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
+
 
 # given optimal parameters, train using training data to get tuned model
 RFTuned <- randomForest(
@@ -1269,20 +1261,9 @@ RFPred <- predict(RFTuned, newdata = X_test_subset)
 RFProb <- predict(RFTuned, newdata = X_test_subset, type = "prob")
 
 # compute test roc and auc of tuned model
-RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1))
+RF_roc <- roc(response = factor(y_test), predictor = RFProb[, 2], levels = c(0, 1), quiet = TRUE)
 RF_auc <- round(auc(RF_roc), 4)
 cat("Random Forest AUC (Subset):", RF_auc, "\n")
-
-# plot roc
-plot(y = RF_roc$sensitivities, x = 1 - RF_roc$specificities, type = 'l',
-     col = 'darkblue', lwd = 2, xlab = 'False Positive Rate', ylab = 'True Positive Rate',
-     main = 'ROC Curve for Random Forest (Subset)')
-abline(a = 0, b = 1, lty = 2, col = 'gray')
-grid()
-legend('bottomright',
-       legend = c(sprintf("Random Forest AUC: %.3f", auc(RF_roc)), 'Random Guess'),
-       lty = c(1, 2), lwd = 2, col = c('darkblue', 'gray'))
-box()
 
 # gen confusion matrix
 generate_cm(
@@ -1290,10 +1271,153 @@ generate_cm(
   predicted = RFPred,
   title = "Confusion Matrix for Random Forest (Subset)"
 )
-
 ```
 
+# Results - Comparison
+
+```{r}
+# function to plot ROC curves for multiple models
+plot_multiple_roc <- function(roc_list, labels, colors, lwd_list, lty_list, main_title) {
+  # Plot the first model as the base plot
+  plot(
+    x = 1 - roc_list[[1]]$specificities, 
+    y = roc_list[[1]]$sensitivities, 
+    type = "l",
+    col = colors[1], 
+    lwd = lwd_list[1], 
+    lty = lty_list[1],
+    xlim = c(0, 1), 
+    ylim = c(0, 1), 
+    main = main_title, 
+    xlab = "False Positive Rate", 
+    ylab = "True Positive Rate",
+    cex.lab = 1.5, 
+    cex.main = 1.8, 
+    cex.axis = 1.2
+  )
+  
+  # Add the remaining ROC curves
+  for (i in 2:length(roc_list)) {
+    lines(
+      x = 1 - roc_list[[i]]$specificities, 
+      y = roc_list[[i]]$sensitivities, 
+      col = colors[i], 
+      lwd = lwd_list[i], 
+      lty = lty_list[i]
+    )
+  }
+  
+  # Add legend
+  legend(
+    "bottomright", 
+    legend = labels, 
+    col = colors, 
+    lwd = lwd_list, 
+    lty = lty_list, 
+    bty = "n"
+  )
+}
+
+# set list of input rcs and associated labels, colors etc for arguments
+roc_list <- list(logit_roc, lasso_roc_full, ridge_roc_full, RF_roc, ridge_roc_subset, lasso_roc_subset, en_opt_roc_subset)
+labels <- c(
+  sprintf("LASSO Full (AUC: %.4f)", lasso_auc_full),
+  sprintf("Ridge Full (AUC: %.4f)", ridge_auc_full),
+  sprintf("Logistic Regression (AUC: %.4f)", logit_auc),
+  sprintf("Random Forest Subset (AUC: %.4f)", RF_auc),
+  sprintf("Ridge Subset (AUC: %.4f)", ridge_auc_subset),
+  sprintf("LASSO Subset (AUC: %.4f)", lasso_auc_subset),
+  sprintf("Elastic Net Subset (AUC: %.4f)", en_opt_auc_subset)
+)
+colors <- c("red", "darkgreen", "blue", "darkorange", "lightgreen", "pink", "purple")
+lwd_list <- c(3, 3, 2, 2, 2, 2, 2)
+lty_list <- c(2, 3, 1, 1, 3, 2, 1)
+
+#call
+plot_multiple_roc(
+  roc_list = roc_list,
+  labels = labels,
+  colors = colors,
+  lwd_list = lwd_list,
+  lty_list = lty_list,
+  main_title = "ROC Curves for All Models"
+)
+
+
+# make and print sorted table of AUCs
+auc_table <- data.frame(
+  Model = c(
+    "Logistic Regression",
+    "LASSO Full",
+    "LASSO Subset",
+    "Ridge Full",
+    "Ridge Subset",
+    "Elastic Net Subset",
+    "Random Forest Subset"
+  ),
+  AUC = c(
+    logit_auc,
+    lasso_auc_full,
+    lasso_auc_subset,
+    ridge_auc_full,
+    ridge_auc_subset,
+    en_opt_auc_subset,
+    RF_auc
+  )
+)
+
+auc_table <- auc_table %>% 
+  arrange(desc(AUC))
+
+print(auc_table)
+```
+
+Insert interpretation on relative out of sample predictive performance
+
 ## Variable Importance
+
+```{r}
+# Function to compute and plot variable importance
+compute_variable_importance <- function(coefficients, model_name, top_n = 20) {
+  importance_df <- data.frame(
+    Variable = names(coefficients),
+    Scaled_Importance = abs(coefficients) / max(abs(coefficients), na.rm = TRUE)
+  ) %>%
+    filter(Scaled_Importance > 0) %>%
+    arrange(desc(Scaled_Importance)) %>%
+    slice(1:top_n)
+  
+  ggplot(importance_df, aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
+    geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+    coord_flip() +
+    labs(
+      title = paste("Top", top_n, "Var Imp for", model_name),
+      x = "Variable",
+      y = "Scaled Importance"
+    ) +
+    theme_minimal()
+}
+
+# 1. Logistic Regression
+logit_coeff <- coef(logit) 
+logit_coeff <- logit_coeff[-1] 
+logit_plot <- compute_variable_importance(logit_coeff, "Logistic Regression")
+print(logit_plot)
+
+# 2. LASSO Subset
+lasso_subset_coeff <- as.numeric(coef(lasso_subset, s = lasso_lambda_min_subset)) 
+names(lasso_subset_coeff) <- rownames(coef(lasso_subset, s = lasso_lambda_min_subset))
+lasso_subset_coeff <- lasso_subset_coeff[-1] 
+lasso_plot <- compute_variable_importance(lasso_subset_coeff, "LASSO Subset")
+print(lasso_plot)
+
+# 3. Ridge Subset
+ridge_subset_coeff <- as.numeric(coef(ridge_subset, s = ridge_lambda_min_subset)) 
+names(ridge_subset_coeff) <- rownames(coef(ridge_subset, s = ridge_lambda_min_subset))
+ridge_subset_coeff <- ridge_subset_coeff[-1] 
+ridge_plot <- compute_variable_importance(ridge_subset_coeff, "Ridge Subset")
+print(ridge_plot)
+```
 
 ```{r}
 # Extract Random Forest importance
@@ -1309,7 +1433,7 @@ ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20)
        aes(x = reorder(Variable, Scaled_Importance), y = Scaled_Importance)) +
   geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
   coord_flip() +
-  labs(title = "Top 20 Random Forest Variable Importance (Subset)",
+  labs(title = "Top 20 Var Imp for RF",
        x = "Variable",
        y = "Scaled Importance") +
   theme_minimal()
@@ -1317,10 +1441,8 @@ ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20)
 
 Insert interpretation on importance
 
-Relative to lasso etc.
-
 # Conclusion
 
-make a final graph here with the ROCs for each model on the same graph, or a table of AUCs for each model, to make it easier to compare rather than going back and looking at at separate graphs etc
+summary, racial component?
 
 note limitations of our analysis, possible extensions
