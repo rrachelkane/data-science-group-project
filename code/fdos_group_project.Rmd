@@ -907,187 +907,15 @@ mse_logit <- mean((predict_logit - y_test)^2)
 print(mse_logit)
 
 ```
-
 We now run penalised regressions; LASSO, Ridge and Elastic Net.
 
 We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
 
 As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
 
--Note Lucas: Here is the updated elastic net regression which optimises between ridge and lasso.
-
 ##Cross-Validation Set Generations for Linear Shrinkage
 
 ```{r}
-#Create 3-way data partition for a two-way parametre optimisation in linear shrinkage estimator
-set.seed(2)
-
-#Split test data away from training and validation data
-train_val_en_index <- createDataPartition(y, p =0.8, list=FALSE)
-y_test_en <- y[-train_val_en_index]
-X_test_en <- X[-train_val_en_index, ]
-X_test_en_subset <- X_subset[-train_val_en_index, ]
-
-#Split training and validation data
-train_en_index <- createDataPartition(y[train_val_en_index], p=0.5, list=FALSE)
-y_train_en <- y[train_en_index]
-X_train_en <- X[train_en_index, ]
-X_train_en_subset <- X_subset[train_en_index, ]
-
-y_val_en <- y[-train_en_index]
-X_val_en <- X[-train_en_index, ]
-X_val_en_subset <- X_subset[-train_en_index, ]
-```
-
-## Shrinkage Estimator Optimisation
-
-```{r}
-#Optimise elastic net over range of alphas
-
-alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
-# Initialize with the lowest possible values
-en_opt_best_alpha <- NULL
-en_opt_best_auc <- 0
-en_opt_best_lambda <- NULL
-
-# Iterate over alpha values
-for (alpha in alpha_values) {
-  #Train Elastic Net model for the given alpha
-  en_opt <- cv.glmnet(X_train_en, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
-  
-  #Get the best lambda from cross-validation
-  en_opt_lambda_min <- en_opt$lambda.min
-  
-  # Predict probabilities on the validation set - need to update with X_validate
-  en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_val_en, type = "response")
-  
-  # Compute AUC
-  en_opt_auc_value <- auc(response = y_val_en, predictor = en_opt_y_prob)
-  
-  # Update best alpha if AUC improves
-  if (en_opt_auc_value > en_opt_best_auc) {
-    en_opt_best_auc <- en_opt_auc_value
-    en_opt_best_alpha <- alpha
-    en_opt_best_lambda <- en_opt_lambda_min
-  }
-}
-
-en_opt_y_test <- predict(en_opt, s = en_opt_lambda_min, newx = X_test_en, type = "response")
-en_opt_best_auc <- auc(response = y_test_en, predictor = en_opt_y_test)
-
-# Output best alpha, lambda and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
-
-# Best alpha is stored in `en_opt_best_lambda` with lambda = `en_opt_best_lambda`
-en_opt <- cv.glmnet(X_train_en, y_train_en, alpha=en_opt_best_alpha, family="binomial", type.measure = "class")
-
-# plot misclassification error against log lambda
-plot(en_opt)
-title(main = "cross-validation misclassification error (elastic net)",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "misclassification error")
-
-# plot coefficients
-plot(en_opt$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "coefficient shrinkage path for elastic net",
-      sub = "optimal lambda highlighted in red",
-      xlab = "log(lambda)",
-      ylab = "coefficients")
-
-# get fitted probabilities
-en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, X_test_en, type = "response")
-nrow(en_opt_predict)
-
-# add variable for predicted classes
-en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
-
-# plot confusion matrix for en regression out of sample
-generate_cm(y_test_en, en_opt_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
-
-# compute roc object for subset ridge model
-en_opt_roc_full <- roc(response = y_test_en, predictor = en_opt_predict)
-```
-
-## Linear Shrinkage Sensitivity Analysis - Over Subset
-
-```{r}
-
-#Optimise elastic net over range of alphas
-
-# Recall alpha_values <- seq(0, 1, by = 0.01) 
-
-# Initialize with the lowest possible values
-en_opt_best_alpha_subset <- NULL
-en_opt_best_auc_subset <- 0
-en_opt_best_lambda_subset <- NULL
-
-# Iterate over alpha values
-for (alpha in alpha_values) {
-  #Train Elastic Net model for the given alpha
-  en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
-  
-  #Get the best lambda from cross-validation
-  en_opt_lambda_min_subset <- en_opt_subset$lambda.min
-  
-  # Predict probabilities on the validation set - need to update with X_validate
-  en_opt_y_prob_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_val_en_subset, type = "response")
-  
-  # Compute AUC
-  en_opt_auc_value_subset <- auc(response = y_val_en, predictor = en_opt_y_prob_subset)
-  
-  # Update best alpha if AUC improves
-  if (en_opt_auc_value_subset > en_opt_best_auc_subset) {
-    en_opt_best_auc_subset <- en_opt_auc_value_subset
-    en_opt_best_alpha_subset <- alpha
-    en_opt_best_lambda_subset <- en_opt_lambda_min
-  }
-}
-
-en_opt_y_test_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_test_en_subset, type = "response")
-en_opt_best_auc_subset <- auc(response = y_test_en, predictor = en_opt_y_test_subset)
-
-# Output best alpha, lambda and its AUC
-cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda_subset))
-cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha_subset))
-cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc_subset))
-
-# Best alpha is stored in `en_opt_best_lambda_subset` with lambda in `en_opt_best_lambda_subset`
-
- en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en_subset, alpha = en_opt_best_alpha_subset, family = "binomial", type.measure = "class")
- 
-# plot misclassification error against log lambda for subset
-plot(en_opt_subset)
-title(main = "Cross-Validation Misclassification Error (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Misclassification Error")
-
-# plot coefficient shrinkage for subset
-plot(en_opt_subset$glmnet.fit, xvar = "lambda", label = TRUE)
-title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
-      sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)",
-      ylab = "Coefficients")
-
-# get fitted probabilities for subset
-en_opt_predict_subset <- predict(en_opt_subset, s = en_opt_best_lambda_subset, X_test_subset_en, type = "response")
-
-# add variable for predicted classes for subset
-en_opt_y_hat_subset <- ifelse(en_opt_predict_subset > 0.5, 1, 0)
-
-# plot confusion matrix for en_subset regression out of sample
-generate_cm(y_test_en, en_opt_y_hat_subset, "Confusion Matrix for Elastic Net (Subset Model)")
-
-# compute roc object for subset ridge model
-en_opt_roc_subset <- roc(response = y_test_en, predictor = en_predict_subset)
-
-# plot combined roc curve for ridge models
-plot_combined_roc(en_opt_roc_full, en_opt_roc_subset, "Elastic Net Full", "Elastic Net Subset")
-```
-#Here on out is redundant for shrinkage estimation
 ## LASSO
 
 **insert formula**
@@ -1245,138 +1073,176 @@ ridge_roc_subset <- roc(response = y_test, predictor = ridge_predict_subset)
 plot_combined_roc(ridge_roc_full, ridge_roc_subset, "Ridge Full", "Ridge Subset")
 ```
 
-## Elastic Net
+## Elastic Net Estimator Optimisation
 
-**insert formula**
+#Create 3-way data partition for a two-way parametre optimisation in elastic net estimator
+set.seed(2)
 
-note no optimization of alpha here, yet
-*Note - Lucas* This is where we could use the basis of the earlier en regression I did. I.e. initialise an en with alpha of 0 and then increase alpha and replace it in the model only if it improves accuracy - to discuss
-note here - add training accuracy measures? to compare
+#Split test data away from training and validation data
+train_val_en_index <- createDataPartition(y, p =0.8, list=FALSE)
+y_test_en <- y[-train_val_en_index]
+X_test_en <- X[-train_val_en_index, ]
+X_test_en_subset <- X_subset[-train_val_en_index, ]
+
+#Split training and validation data
+train_en_index <- createDataPartition(y[train_val_en_index], p=0.5, list=FALSE)
+y_train_en <- y[train_en_index]
+X_train_en <- X[train_en_index, ]
+X_train_en_subset <- X_subset[train_en_index, ]
+
+y_val_en <- y[-train_en_index]
+X_val_en <- X[-train_en_index, ]
+X_val_en_subset <- X_subset[-train_en_index, ]
+```
+# Elastic Net Full Regression
+* Insert Formula
 
 ```{r}
-# run elastic net regression on training data to collect coefficients
-en <- cv.glmnet(x = X_train, y = y_train, alpha = 0.5, family = "binomial", type.measure = "class")
+#Optimise elastic net over range of alphas
 
-en_lambda_min <- en$lambda.min
-cat("optimal lambda for elastic net:", en_lambda_min, "\n")
+alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
+# Initialize with the lowest possible values
+en_opt_best_alpha <- NULL
+en_opt_best_auc <- 0
+en_opt_best_lambda <- NULL
+
+# Iterate over alpha values
+for (alpha in alpha_values) {
+  #Train Elastic Net model for the given alpha
+  en_opt <- cv.glmnet(X_train_en, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
+  
+  #Get the best lambda from cross-validation
+  en_opt_lambda_min <- en_opt$lambda.min
+  
+  # Predict probabilities on the validation set - need to update with X_validate
+  en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_val_en, type = "response")
+  
+  # Compute AUC
+  en_opt_auc_value <- auc(response = y_val_en, predictor = en_opt_y_prob)
+  
+  # Update best alpha if AUC improves
+  if (en_opt_auc_value > en_opt_best_auc) {
+    en_opt_best_auc <- en_opt_auc_value
+    en_opt_best_alpha <- alpha
+    en_opt_best_lambda <- en_opt_lambda_min
+  }
+}
+
+en_opt_y_test <- predict(en_opt, s = en_opt_lambda_min, newx = X_test_en, type = "response")
+en_opt_best_auc <- auc(response = y_test_en, predictor = en_opt_y_test)
+
+# Output best alpha, lambda and its AUC
+cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda))
+cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
+cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
+
+# Best alpha is stored in `en_opt_best_lambda` with lambda = `en_opt_best_lambda`
+en_opt <- cv.glmnet(X_train_en, y_train_en, alpha=en_opt_best_alpha, family="binomial", type.measure = "class")
 
 # plot misclassification error against log lambda
-plot(en)
+plot(en_opt)
 title(main = "cross-validation misclassification error (elastic net)",
       sub = "optimal lambda highlighted in red",
       xlab = "log(lambda)",
       ylab = "misclassification error")
 
 # plot coefficients
-plot(en$glmnet.fit, xvar = "lambda", label = TRUE)
+plot(en_opt$glmnet.fit, xvar = "lambda", label = TRUE)
 title(main = "coefficient shrinkage path for elastic net",
       sub = "optimal lambda highlighted in red",
       xlab = "log(lambda)",
       ylab = "coefficients")
 
 # get fitted probabilities
-en_predict <- predict(en, s = en_lambda_min, X_test, type = "response")
-nrow(en_predict)
+en_opt_predict <- predict(en_opt, s = en_opt_best_lambda, X_test_en, type = "response")
+nrow(en_opt_predict)
 
 # add variable for predicted classes
-en_y_hat <- ifelse(en_predict > 0.5, 1, 0)
+en_opt_y_hat <- ifelse(en_opt_predict > 0.5, 1, 0)
 
 # plot confusion matrix for en regression out of sample
-generate_cm(y_test, en_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
+generate_cm(y_test_en, en_opt_y_hat, "Confusion Matrix for Elastic Net (Full Model)")
 
 # compute roc object for subset ridge model
-en_roc_full <- roc(response = y_test, predictor = en_predict)
+en_opt_roc_full <- roc(response = y_test_en, predictor = en_opt_predict)
 ```
 
-### Sensitivity Analysis - Subset
+## Elastic Net Sensitivity Analysis - Over Subset
 
 ```{r}
-# run elastic net regression on subset training data to collect coefficients
-en_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0.5, family = "binomial", type.measure = "class")
 
-# get optimal lambda for elastic net subset
-en_lambda_min_subset <- en_subset$lambda.min
-cat("Optimal Lambda for Elastic Net (Subset):", en_lambda_min_subset, "\n")
+#Optimise elastic net over range of alphas
 
+# Recall alpha_values <- seq(0, 1, by = 0.01) 
+
+# Initialize with the lowest possible values
+en_opt_best_alpha_subset <- NULL
+en_opt_best_auc_subset <- 0
+en_opt_best_lambda_subset <- NULL
+
+# Iterate over alpha values
+for (alpha in alpha_values) {
+  #Train Elastic Net model for the given alpha
+  en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en, alpha = alpha, family = "binomial", type.measure = "class")
+  
+  #Get the best lambda from cross-validation
+  en_opt_lambda_min_subset <- en_opt_subset$lambda.min
+  
+  # Predict probabilities on the validation set - need to update with X_validate
+  en_opt_y_prob_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_val_en_subset, type = "response")
+  
+  # Compute AUC
+  en_opt_auc_value_subset <- auc(response = y_val_en, predictor = en_opt_y_prob_subset)
+  
+  # Update best alpha if AUC improves
+  if (en_opt_auc_value_subset > en_opt_best_auc_subset) {
+    en_opt_best_auc_subset <- en_opt_auc_value_subset
+    en_opt_best_alpha_subset <- alpha
+    en_opt_best_lambda_subset <- en_opt_lambda_min
+  }
+}
+
+en_opt_y_test_subset <- predict(en_opt_subset, s = en_opt_lambda_min_subset, newx = X_test_en_subset, type = "response")
+en_opt_best_auc_subset <- auc(response = y_test_en, predictor = en_opt_y_test_subset)
+
+# Output best alpha, lambda and its AUC
+cat(sprintf("Best Lambda: %.5f\n", en_opt_best_lambda_subset))
+cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha_subset))
+cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc_subset))
+
+# Best alpha is stored in `en_opt_best_lambda_subset` with lambda in `en_opt_best_lambda_subset`
+
+ en_opt_subset <- cv.glmnet(X_train_en_subset, y_train_en_subset, alpha = en_opt_best_alpha_subset, family = "binomial", type.measure = "class")
+ 
 # plot misclassification error against log lambda for subset
-plot(en_subset)
+plot(en_opt_subset)
 title(main = "Cross-Validation Misclassification Error (Elastic Net - Subset)",
       sub = "Optimal Lambda Highlighted in Red",
       xlab = "Log(Lambda)",
       ylab = "Misclassification Error")
 
 # plot coefficient shrinkage for subset
-plot(en_subset$glmnet.fit, xvar = "lambda", label = TRUE)
+plot(en_opt_subset$glmnet.fit, xvar = "lambda", label = TRUE)
 title(main = "Coefficient Shrinkage Path (Elastic Net - Subset)",
       sub = "Optimal Lambda Highlighted in Red",
       xlab = "Log(Lambda)",
       ylab = "Coefficients")
 
 # get fitted probabilities for subset
-en_predict_subset <- predict(en_subset, s = en_lambda_min_subset, X_test_subset, type = "response")
+en_opt_predict_subset <- predict(en_opt_subset, s = en_opt_best_lambda_subset, X_test_subset_en, type = "response")
 
 # add variable for predicted classes for subset
-en_y_hat_subset <- ifelse(en_predict_subset > 0.5, 1, 0)
+en_opt_y_hat_subset <- ifelse(en_opt_predict_subset > 0.5, 1, 0)
 
 # plot confusion matrix for en_subset regression out of sample
-generate_cm(y_test, en_y_hat_subset, "Confusion Matrix for Elastic Net (Subset Model)")
+generate_cm(y_test_en, en_opt_y_hat_subset, "Confusion Matrix for Elastic Net (Subset Model)")
 
 # compute roc object for subset ridge model
-en_roc_subset <- roc(response = y_test, predictor = en_predict_subset)
+en_opt_roc_subset <- roc(response = y_test_en, predictor = en_predict_subset)
 
 # plot combined roc curve for ridge models
-plot_combined_roc(en_roc_full, en_roc_subset, "Elastic Net Full", "Elastic Net Subset")
+plot_combined_roc(en_opt_roc_full, en_opt_roc_subset, "Elastic Net Full", "Elastic Net Subset")
 ```
-
-### Tuning Alpha
-
-Now, we tune $\alpha$, as [demonstrate rationale]
-
-NB here - I just use the subset in random forest, because 1 it takes a while to run, so not gonna do both, and 2 its more conservative for ex-ante arrest prediction - cops are interested in predicting arrest before theyve began to interact with the person, just observables available to them before working the stop
-
-i think here we should tune alpha then for the subset example
-
-```{r}
-#alpha_values <- seq(0, 1, by = 0.01)  # Range of alpha to test
-#en_opt_best_alpha <- NULL
-#en_opt_best_auc <- -Inf  # Initialize with the lowest possible AUC
-#en_opt_best_model <- NULL
-#en_opt_best_lambda <- NULL
-
-# Iterate over alpha values
-#for (alpha in alpha_values) {
-  # Train Elastic Net model for the given alpha
-  #en_opt <- cv.glmnet(X_train, y_train, alpha = alpha, family = "binomial", type.measure = "class")
- 
-  # Get the best lambda from cross-validation
-  #en_opt_lambda_min <- en_opt$lambda.min
- 
-  # Predict probabilities on the validation set
-  #en_opt_y_prob <- predict(en_opt, s = en_opt_lambda_min, newx = X_test, type = "response")
- 
-  # Compute AUC
-  #en_opt_auc_value <- auc(response = y_test, predictor = en_opt_y_prob)
- 
-  # Update best alpha if AUC improves
-  #if (en_opt_auc_value > best_auc) {
-    #en_opt_best_auc <- en_opt_auc_value
-    #en_opt_best_alpha <- alpha
-    #en_opt_best_model <- en_opt_auc_value
-    #en_opt_best_lambda <- en_opt_lambda_min
-  #}
- 
-  # Print progress
-  #cat(sprintf("Alpha: %.2f, AUC: %.5f\n", alpha, en_opt_auc_value))
-#}
-
-# Output best alpha and its AUC
-#cat(sprintf("Best Alpha: %.2f\n", en_opt_best_alpha))
-#cat(sprintf("Highest AUC: %.5f\n", en_opt_best_auc))
-
-# Best model is stored in `en_opt_best_model` with lambda = `en_opt_best_lambda`
-```
-## End of irrelevant part
-
 ## Variable Importance
 
 top 20 for logit, tuned shrinkage
