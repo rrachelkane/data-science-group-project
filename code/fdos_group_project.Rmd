@@ -372,37 +372,63 @@ summary(sqf_data$suspect_reported_age)
 summary(sqf_data$suspect_height)
 summary(sqf_data$suspect_weight)
 ```
-
-Let's plot the density of age to see the distribution. Since we have some outliers, we are going to drop any observations where age is below 10 and above 85.
-
+## Feature Transformation 
+Before addressing outliers, we first need to transform the height variable as it is currently in the format of feet.inches. For example, an observation of 5.10 means 5 feet 10 inches and 5.1 means 5 feet 1 inch. We will transform the inches into feet so each observation is only in feet.
+Bear in mind, in the raw data we have values such as 5.90, which really means 5 feet 9 inches, not 5 feet 90 inches. To address this during the conversion, we checked to see if the inches amount had 1 or 2 decimals and handled accordingly. We also ensured all the inches amounts were in between 0 and 11.5 to ensure none were accidentally converted incorrectly. 
 ```{r}
-# compute density for reported_age
-reported_age_density <- density(sqf_data$suspect_reported_age, na.rm = TRUE)
+# Function to convert feet.inches to feet
+convert_to_feet <- function(feet_inches) {
+  # Extract feet (integer part)
+  feet <- floor(feet_inches)
+  
+  # Get the fractional part
+  fractional_part <- feet_inches - feet
+  
+  # Interpret inches based on the fractional part
+  if (fractional_part == 0) {
+    # No fractional part means no additional inches
+    inches <- 0
+  } else {
+    # Convert fractional part to a string to check its length
+    fractional_str <- as.character(fractional_part)
+    
+    if (grepl("\\.\\d$", fractional_str)) {
+      # Case like `.1`: Single digit after decimal -> 1, 2, ..., 9 inches
+      inches <- fractional_part * 10
+    } else if (grepl("\\.\\d0$", fractional_str)) {
+      # Case like `.10`, `.20`, etc.: Two digits ending in `0` -> 10, 20, etc. inches
+      inches <- fractional_part * 100
+    } else {
+      # Case like `.11`, `.12`, etc.: Two digits not ending in `0` -> Exact inches
+      inches <- fractional_part * 100
+    }
+  }
+  
+  # Validate inches (should be between 0 and 11)
+  if (inches < 0 || inches > 11.5) {
+    warning(paste("Invalid height input:", feet_inches, "- Inches must be between 0 and 11.5. Returning NA."))
+    return(NA) # Return NA for invalid inputs
+  }
+  
+  # Convert inches to feet
+  inches_in_feet <- inches / 12
+  
+  # Return total height in feet
+  return(feet + inches_in_feet)
+}
 
-# plot the density
-plot(reported_age_density,
-     main = "Density of Reported Age with Outliers Highlighted",
-     xlab = "Reported Age",
-     ylab = "Density",
-     col = "black",
-     lwd = 2)
-grid()
+# Apply the conversion function to the 'suspect_height' column
+sqf_data$suspect_height_feet <- sapply(sqf_data$suspect_height, convert_to_feet)
 
-# identify and highlight outliers (ages < 10 and > 85)
-outliers <- sqf_data$suspect_reported_age[sqf_data$suspect_reported_age < 10 | sqf_data$suspect_reported_age > 85]
+# Check the result
+tail(sqf_data[, c("suspect_height", "suspect_height_feet")])
 
-# add vertical lines to mark the outlier boundaries
-abline(v = c(10, 85), col = "deeppink", lty = 2, lwd = 2)
+sqf_data$suspect_height <- sqf_data$suspect_height_feet
 
-# highlight the outlier data points on the plot
-points(outliers, rep(0, length(outliers)), col = "deeppink", pch = 19)
-
-# drop outlier observations where age is above 85 and below 10.
-sqf_data <- sqf_data[sqf_data$suspect_reported_age >= 10 & sqf_data$suspect_reported_age <= 85, ]
 
 ```
 
-We plot the density of height to see the distribution and identify outliers. Height appears to be measured in feet and we are going to drop observations below 4 ft and above 7 ft.
+We now plot the density of height in feet to see the distribution and identify outliers. We are going to drop observations below 4 ft and above 7 ft.
 
 ```{r}
 # compute density for suspect_height
@@ -430,7 +456,37 @@ points(outliers, rep(0, length(outliers)), col = "darkorchid2", pch = 19)
 sqf_data <- sqf_data[sqf_data$suspect_height >= 4 & sqf_data$suspect_height <= 7, ]
 ```
 
-We plot the density of weight to identify outliers. The weight variable appears to be measured in pounds and it appears that some observations could have data entry errors (they are nonsensical). We will drop outliers above 300 lbs and below 90 lbs.
+We plot the density of age to see the distribution. Since we have some outliers, we dropped any observations where age is below 10 and above 85. We also noticed the `suspect_reported_age` data is quiet skewed, so we applied a logarithmic transformation to this variable. 
+
+```{r}
+# compute density for reported_age
+reported_age_density <- density(sqf_data$suspect_reported_age, na.rm = TRUE)
+
+# plot the density
+plot(reported_age_density,
+     main = "Density of Reported Age with Outliers Highlighted",
+     xlab = "Reported Age",
+     ylab = "Density",
+     col = "black",
+     lwd = 2)
+grid()
+
+# identify and highlight outliers (ages < 10 and > 85)
+outliers <- sqf_data$suspect_reported_age[sqf_data$suspect_reported_age < 10 | sqf_data$suspect_reported_age > 85]
+
+# add vertical lines to mark the outlier boundaries
+abline(v = c(10, 85), col = "deeppink", lty = 2, lwd = 2)
+
+# highlight the outlier data points on the plot
+points(outliers, rep(0, length(outliers)), col = "deeppink", pch = 19)
+
+# drop outlier observations where age is above 85 and below 10.
+sqf_data <- sqf_data[sqf_data$suspect_reported_age >= 10 & sqf_data$suspect_reported_age <= 85, ]
+#Since the `suspect_reported_age` data is quiet skewed, we will perform a logarithmic transformation. 
+sqf_data$suspect_reported_age <- log(sqf_data$suspect_reported_age)
+```
+
+We plot the density of weight to identify outliers. The weight variable is measured in pounds and it appears that some observations could have data entry errors (for example: 9, 16, 760). We will drop outliers above 300 lbs and below 90 lbs.
 
 ```{r}
 # compute density for suspect_weight
@@ -454,12 +510,12 @@ abline(v = c(90, 300), col = "darkturquoise", lty = 2, lwd = 2)
 # highlight the outlier data points on the plot
 points(outliers, rep(0, length(outliers)), col = "darkturquoise", pch = 19)
 
-# drop outlier observations where height is above 300 lbs. and below 90 lbs.
+# drop outlier observations where height is above 350 lbs. and below 90 lbs.
 sqf_data <- sqf_data[sqf_data$suspect_weight >= 90 & sqf_data$suspect_weight <= 300, ]
 
 ```
 
-Finally, we will standardize our numerical variables as they use different scales.
+Finally, we will standardize our numerical variables as they use different scales. This will allow us to better compare coefficients of these variables. 
 
 ```{r}
 # standardize the numeric variables
@@ -474,7 +530,9 @@ sqf_data <- sqf_data %>%
 summary(sqf_data$suspect_reported_age)
 summary(sqf_data$suspect_height)
 summary(sqf_data$suspect_weight)
+
 ```
+
 
 # Exploratory Data Analysis
 
