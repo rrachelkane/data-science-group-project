@@ -392,6 +392,7 @@ summary(sqf_data$suspect_weight)
 Before addressing outliers in the three numerical features, we first need to transform the height variable as it is currently in the format of feet.inches. This creates an issue as an observation of 5.10 means 5 feet 10 inches, but 5.1 means 5 feet 1 inch. We will transform the inches into feet so each observation is only in feet.
 
 It should be noted that in the raw data we have values such as 5.90, which really means 5 feet 9 inches, not 5 feet 90 inches. To address this during the conversion, we checked to see if the inches amount had 1 or 2 decimals and handled accordingly. We also ensured all the inches amounts were in between 0 and 11.9 to ensure none were accidentally converted incorrectly. 
+
 ```{r}
 # Function to convert feet.inches to feet
 convert_to_feet <- function(feet_inches) {
@@ -442,8 +443,9 @@ tail(sqf_data[, c("suspect_height", "suspect_height_feet")])
 
 sqf_data$suspect_height <- sqf_data$suspect_height_feet
 
-#drop suspect
+#drop suspect_height_feet
 sqf_data <- sqf_data %>% dplyr::select(-suspect_height_feet)
+
 ```
 
 We now plot the density of height in feet to see the distribution and identify outliers. We are going to drop observations below 4 ft and above 7 ft.
@@ -1411,8 +1413,9 @@ plot_multiple_roc <- function(roc_list, labels, colors, lwd_list, lty_list, main
   )
 }
 
-# set list of input rcs and associated labels, colors etc for arguments
-roc_list <- list(logit_roc, lasso_roc_full, ridge_roc_full, RF_roc, ridge_roc_subset, lasso_roc_subset, en_opt_roc_subset)
+# create list of rocs and associated labels and colors
+roc_list <- list(lasso_roc_full, ridge_roc_full, logit_roc, RF_roc, ridge_roc_subset, lasso_roc_subset, en_opt_roc_subset)
+
 labels <- c(
   sprintf("LASSO Full (AUC: %.4f)", lasso_auc_full),
   sprintf("Ridge Full (AUC: %.4f)", ridge_auc_full),
@@ -1422,9 +1425,11 @@ labels <- c(
   sprintf("LASSO Subset (AUC: %.4f)", lasso_auc_subset),
   sprintf("Elastic Net Subset (AUC: %.4f)", en_opt_auc_subset)
 )
+
 colors <- c("red", "darkgreen", "blue", "darkorange", "lightgreen", "pink", "purple")
 lwd_list <- c(3, 3, 2, 2, 2, 2, 2)
 lty_list <- c(2, 3, 1, 1, 3, 2, 1)
+
 
 #call
 plot_multiple_roc(
