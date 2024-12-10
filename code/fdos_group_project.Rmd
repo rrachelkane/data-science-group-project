@@ -119,7 +119,13 @@ na_cols <- colMeans(is.na(sqf_data)) * 100
 na_cols[na_cols > 0]
 ```
 
-The process generating the missingness of `demeanor_of_person_stopped` is unclear. Imputation of this would be difficult, so we drop this column.
+The process generating the missingness of `demeanor_of_person_stopped` is unclear. 
+
+```{r}
+sqf_data[1:5, "demeanor_of_person_stopped"]
+```
+
+Imputation of this would be difficult, so we drop this column.
 
 ```{r}
 # drop 
@@ -175,6 +181,11 @@ sqf_data %>%
   group_by(weapon_found_flag, firearm_flag) %>% 
   summarise(N = n()) %>% 
   kable()
+
+# note that for the identifying variables related to cops, "yes" entries are indicated unusually
+print(unique(sqf_data$id_card_identifies_officer_flag))
+print(unique(sqf_data$verbal_identifies_officer_flag))
+print(unique(sqf_data$shield_identifies_officer_flag))
 ```
 
 Note here that even though a `firearm_flag` has a `"Y"` entry and `weapon_found_flag` has a `"N"` entry, this is not necessarily incorrect, as the officer can have identified a firearm without having to carry out a frisk nor a `search.
@@ -188,28 +199,31 @@ We deal with these cases of `(null)` separately:
 null_2 <- c()
 
 # loop through columns
+# loop through columns
 for (col in names(sqf_data)) {
-  # get unique values of the col
+  # Get unique values of the column
   unique_values <- unique(sqf_data[[col]])
   
-  # if the unique values are exactly "Y" and "(null)"
-  if (all(unique_values %in% c("Y", "(null)")) && length(unique_values) == 2) {
-    null_2 <- c(null_2, col)  # add column name to null_2
+  # Check if unique values are exactly a subset of "Y", "I", "V", "S", and "(null)"
+  if (all(unique_values %in% c("Y", "I", "V", "S", "(null)")) && length(unique_values) == 2) {
+    null_2 <- c(null_2, col)  # Add column name to null_2
   }
 }
 
 # check n of type 2 nulls
 length(null_2)
 
-# pre-clean check
+# pre-clean check examples
 print(unique(sqf_data$firearm_flag))
+print(unique(sqf_data$id_card_identifies_officer_flag))
 
 # replace these nulls with Ns
 sqf_data <- sqf_data %>%
   mutate(across(all_of(null_2), ~ ifelse(. == "(null)", "N", .)))
 
-# post-clean check
+# post-clean check examples
 print(unique(sqf_data$firearm_flag))
+print(unique(sqf_data$id_card_identifies_officer_flag))
 ```
   
 * now replace the first type with actual `NA` values:
@@ -289,21 +303,23 @@ dim(sqf_data)
 
 ## Coding of Binary Variables
 
-We change the coding of binary variables from `"Y"` and `"N"`:
+We change the coding of binary variables:
 
 ```{r}
 # pre check
-print(unique(sqf_data$frisked_flag))
+print(unique(sqf_data$firearm_flag))
+print(unique(sqf_data$id_card_identifies_officer_flag))
 
 # clean Ys and Ns and set as numeric
 sqf_data <- sqf_data %>%
   mutate(across(
-    where(~ all(. %in% c("Y", "N"))), 
-    ~ as.numeric(ifelse(. == "Y", 1, ifelse(. == "N", 0, NA)))  #
+    where(~ all(. %in% c("Y", "N", "I", "V", "S"))), 
+    ~ as.numeric(ifelse(. %in% c("Y", "I", "V", "S"), 1, 0))
   ))
 
 # post check
-print(unique(sqf_data$frisked_flag))
+print(unique(sqf_data$firearm_flag))
+print(unique(sqf_data$id_card_identifies_officer_flag))
 ```
 
 ## Other Column Cleaning
