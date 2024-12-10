@@ -1091,6 +1091,7 @@ cat("AUC for the LASSO (full) model", lasso_auc_full, "\n")
 lasso_subset <- cv.glmnet(x=X_train_subset, y=y_train, alpha = 1, family="binomial", type.measure = "class")
 
 lasso_lambda_min_subset <- lasso_subset$lambda.min
+cat("Optimal Lambda for Lasso (Subset):", lasso_lambda_min_subset, "\n")
 
 # plot misclassification error against log lambda
 plot(lasso_subset)
