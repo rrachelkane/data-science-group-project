@@ -15,35 +15,25 @@ output:
 ---
 
 # Abstract
-In the early 2000s, the New York City Police Department was required to publicly report data on their stop-and-frisk program. This program allows officers to temporarily stop, question, and potentially frisk/search civilians they suspect may have committed a crime without needing evidence or a warrant. The stops may result in release, arrest, or criminal summons. As civilians can be stopped without evidence, we want to explore what variables are the most accurate prediction of the stop resulting in arrest. In order to predict arrests, we will use classification methods. WRITE MORE ABOUT METHODS, FINDINGS, and CONCLUSIONS
 
-The goal of our project is to predict Y. *edit, include key findings*
+We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest prediction fits best and that it indicated wealth and income factors being the most important predictors of arrest.
 
 # Introduction
-For over 20 years, civilians in NYC may be stopped, question, and searched by the police based solely on suspicion without any evidence. From 2002 – 2012, under Mayor Bloomberg’s administration, stops were more rampant, reaching a peak in 2011 with 685,724 reported stops (NYCLU 2024). With changes to administrations, the number of stops has decreased in recent years with 15,102 and 16,791 stops in 2022 and 2023 respectively. 
-The stop-and-frisk program has been highly criticized as it does not require evidence to stop individuals and may allow police to use racial profiling tactics to target individuals. For example, the American Civil Liberties Union of New York (NYCLU) has criticized the program as their investigation of the data found a disproportionate number of civilians stopped are people of color, in particular Black civilians, and some stops have resulted in police misconduct. As the stops do not require previous evidence or warrants, we are interested in predicting which stops result in arrest, particularly focusing on factors gathered before the stop begins that may predict arrest, such as demographic characteristics of civilians, location, time of day, and attributes of the police officers. 
+For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the NYPD Stop, Question and Frisk Data (https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
 
-* **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator which equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
 
-* **Motivation:** *edit here re relevance, cite some literature*
+* **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator that equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
 
-* **Relevant features:** *edit*
+* **Motivation:**
+The stop-and-frisk program has been highly criticized as it does not require evidence to stop individuals and may allow police to use racial profiling tactics to target individuals. The American Civil Liberties Union of New York found that the program disproportionately stops civilians of colour, in particular Black civilians, with some stops resulting in police misconduct. As the stops do not require prior evidence or warrants, we are interested in predicting which stops result in arrest. We particularly focus on factors gathered before the stop begins that may predict arrest, such as demographic characteristics of civilians, location, time of day, and attributes of the police officers. This sheds light on which factors are most important in predicting arrests, and whether race is an important factor once a suspect has been stopped.
 
-* **Methods:** *edit*
+* **Relevant Features and Methods:**
+The dataset contains 82 columns, including identifying features, location features, timestamps, continuous features and dummy variables. We keep as many features as relevant, however, we drop certain features such as identifying features, features with a high proportion of NAs, and any “excess” features that become irrelevant after feature engineering and extraction. We then reclassify categorical features into dummy variables. This yields a dataset of 155 features in our full model and 125 in our subset model, which only considers features measurable before the stop. We explore comparisons between a logit regression model, shrinkage estimators, and a random forest. In particular, we exploit the ability of shrinkage estimators and random forests to deal with sparse models. We also run models on test and validation subsets before comparing them across similar test models when comparing the predictive abilities to avoid overfitting.
+
+* **Preliminary Results:**
+Whilst we find that the logit model does a decent job of prediction, it is improved on by shrinkage estimators. Of the shrinkage estimators, the elastic net estimator performs best. In turn the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that racial and wealth based factors are the most important in predicting arrests.
 
 # Data Description
-
-We use the [New York Police Department Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page) from 2023.
- 
-This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme.
-
-* How data is collected & what universe is/is not observed (some note here on the forms they have to fill out to record the stop, refer Precinct and Prejudice paper on why some stops may not actually be recorded)
-
-* **Temporal span**: the entire year of 2023.
-
-* **Spatial span**: the 77 NYPD police precincts covering all 5 boroughs of NYC.  
-
-* **Dimension**: The data has 16971 observations and 82 features, as shown below.
 
 We begin the project by installing and loading in the necessary libraries.
 
@@ -55,7 +45,7 @@ library(pacman)
 p_load(readxl, dplyr, ggplot2, knitr, lubridate, tidyr, sf, httr, caret, glmnet, stringr, remotes, RColorBrewer, viridis, scales, classInt, forcats, pROC, randomForest)
 ```
 
-We proceed by setting up the file path and importing the data from our project's GitHub repository.
+We proceed by setting up the file path and importing the data from our project's GitHub repository. We see that the raw dataset has 16971 observations and 82 features, as shown below.
 
 ```{r}
 # get raw content of the file 
@@ -87,9 +77,11 @@ head(sqf_data)
 
 # Data Cleaning
 
+We then begin going through our dataset for cleaning.
+
 ## Column Names
 
-First, we change column names from strictly upper case to strictly lower case, because it's cuter.
+First, we change column names from strictly uppercase to strictly lowercase, because it's cuter.
 
 ```{r}
 colnames(sqf_data) <- tolower(colnames(sqf_data))
@@ -100,7 +92,9 @@ colnames(sqf_data)[1:3]
 
 ## Relevant Columns
 
-Next, we drop all columns which cannot be used for our prediction question, as they are realized **after** the outcome of interest, namely `arrested_flag`, or are irrelevant for other reasons. We drop spatial features other than x and y coordinates of the stop, as this is the most granular spatial information and we use this to map each stop to census tracts to obtain demographic information corresponding to the location of the stop.These dropped spatial features also have high cardinality, which would add many dummies to our model, undermining computational efficiency.
+Data is collected throughout the stop and some variables like `search_base_incident_to_arrest` are observed explicitly **after** an arrest has occurred, whilst others like `suspect_height` are unchanged from before the arrest. Some other variables like `search_flag` are a measure of an activity that may have occurred either before or after a potential arrest. We drop any variables which clearly take place after an arrest, our outcome of interest, since they cannot be used for our prediction question. We maintain unclear variables but address this later.
+
+We drop spatial features other than x and y coordinates of the stop, as this is the most granular spatial information and we use this to map each stop to census tracts to obtain demographic information corresponding to the location of the stop. These dropped spatial features also have high cardinality, which would add many dummies to our model, undermining computational efficiency.
 
 ```{r}
 sqf_data <- sqf_data %>% 
@@ -258,7 +252,7 @@ sqf_data <- sqf_data %>%
 print(unique(sqf_data$ask_for_consent_flg))
 ```
 
-Now, we percentage of actual missing values, correctly identified by `"NA"`:
+Now, we calculate the percentage of actual missing values, correctly identified by `"NA"`:
 
 ```{r}
 # get % of NAs, in columns with at least one NA
@@ -476,7 +470,7 @@ points(outliers, rep(0, length(outliers)), col = "darkorchid2", pch = 19)
 sqf_data <- sqf_data[sqf_data$suspect_height >= 4 & sqf_data$suspect_height <= 7, ]
 ```
 
-We plot the density of age to see the distribution. Since we have some outliers, we dropped any observations where age is below 10 and above 85. We also noticed the `suspect_reported_age` data is quiet skewed, so we applied a logarithmic transformation to this variable. 
+We plot the density of age to see the distribution. Since we have some outliers, we dropped any observations where age is below 10 and above 85. We also noticed the `suspect_reported_age` data is quite skewed with a right-tail, so we applied a logarithmic transformation to this variable. 
 
 ```{r}
 # compute density for reported_age
@@ -536,7 +530,7 @@ sqf_data <- sqf_data[sqf_data$suspect_weight >= 90 & sqf_data$suspect_weight <= 
 
 ```
 
-Finally, we will standardize our numerical variables as they use different scales. This will allow us to better compare coefficients of these variables. 
+Finally, we will standardize our numerical variables as they use different scales. This will allow us to better compare the coefficients of these variables' predictive capability. 
 
 ```{r}
 # standardize the numeric variables
@@ -558,6 +552,8 @@ summary(sqf_data$suspect_weight)
 # Exploratory Data Analysis
 
 ## Basic Summary Statistics
+
+We first look at some basic summary statistics.
 
 ```{r}
 # check dim again
@@ -670,38 +666,24 @@ ggplot(
   ) +
   theme_minimal()
 
-# heatmap of arrests by issuing officer rank and suspect race
-ggplot(
-  sqf_data %>%
-    group_by(issuing_officer_rank, suspect_race_description) %>%
-    summarise(
-      percent_arrested = mean(suspect_arrested_flag, na.rm = TRUE) * 100,
-      .groups = "drop"
-    ),
-  aes(
-    x = issuing_officer_rank,
-    y = suspect_race_description,
-    fill = percent_arrested
-  )
-) +
-  geom_tile(color = "white") +
-  scale_fill_viridis_c(name = "Arrest Rate (%)") +
-  labs(
-    title = "Heat Map of Arrest Rates",
-    x = "Officer in Uniform",
-    y = "Suspect Race"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
 ```
+
+We see that the vast majority of stops are conducted on men, however, once stopped women are arrested at a slightly higher rate than men.  
+
+The CDF shows us that the youngest and oldest men are more likely to be arrested when stopped, especially when compared with women. This suggests that young adult men are “overstopped” relative to how much they should be.
+
+In terms of racial components, black and hispanic individuals dominate the number of arrests, however, arrest rates do not differ substantially by race, apart from for Native Americans. This is likely due to the small number of stops of individuals of that race, which could lead to anomalies. 
+
+The majority of stops occur under suspicion of criminal possession of a weapon (CPW), or for various forms of theft. However, arrests vary by suspected crime with forcible touching and graffiti being those with the highest arrest rates, whilst suspected drug offences appear to have lower arrest rates.
+
+The heat map shows us that the arrest rate in the Bronx is substantially lower than in Manhattan and Brooklyn, which in turn is lower than Queens and Staten Island. We also see that arrest rates are lower at evening. This could be because these are the times and areas where the most stop and searches occur and therefore, the arrest rates fall.
 
 ## Spatial Data Visualisation
 
+We also wanted to consider how stops and arrests were distributed across NYC.
 We first clean the data for spatial mapping using the `sf` and `nycgeo` packages. 
 
-We use this to obtain information about the stops at the census tract level, due to its granularity and the availability of population statistics at this level. **insert why relevant for prediction**
+We use this to obtain information about the stops at the census tract level, due to its granularity and the availability of population statistics at this level. This will be important for prediction as it will allow us to factor in how police approach specific neighbourhoods that have connotations of low or high-crime. “High-crime” neighbourhoods will likely see more intense policing and more stops which will be associated with a lower arrest rate.
 
 ```{r}
 # drop 7 observations which have incorrect spatial info
@@ -726,6 +708,8 @@ st_crs(nyc_tract_shp)$epsg
 
 ### Stop-Level Maps
 
+We then look at how stops and arrests are distributed across NYC.
+
 ```{r}
 # plot data onto shapefile by arrest status
 ggplot() +
@@ -740,9 +724,11 @@ ggplot() +
         legend.title = element_blank())
 ```
 
+It is difficult to make any clear discernations due to the high frequency of stops, however, most stops and arrests appear to occur in a corridor along the Bronx, Manhattan and Brooklyn. Particularly around the Broknx and Central Brooklyn. This would match up with our earlier suggestion that that these areas have a lower arrest rate because they are more heavily policed.
+
 ### Tract Level Maps
 
-Perhaps it is more informative to view the percentage of stops ending in arrest at the tract level:
+We then consider the percentage of stops resulting in arrests.
 
 ```{r}
 # join datasets to assign each stop to a tract
@@ -771,11 +757,13 @@ ggplot() +
 
 ```
 
+The lowest percentages appear to be in the areas where we saw most stops occurring before, that is the Bronx and Central Brooklyn. On the flipside a higher percentage looks to occur in lower stop neighbourhoods like Queen’s and Staten Island. This suggests that the Bronx and Central Brooklyn are overpoliced/targeted relative to Queen’s and Staten Island. This is more evidence to support the suggestion that areas which are more heavily policed have a lower arrest rate.
+
 ### Tract-Level Population Predictors
 
-Additionally, the `nycgeo` package allows us to link with census tract level American Community Survey (2013-2017) population statistics.
+Additionally, the `nycgeo` package allows us to link with neighbour tabulation area level American Community Survey (2013-2017) population statistics. 
 
-**insert justification for why these - demographic stats of location of the stop - might be predictors of arrest **
+We want to use this to be able to see how certain demographic factors are distributed across NYC to see if any potential correlations appear between certain demographic factors, like race.
 
 We visualize those here:
 ```{r}
@@ -842,6 +830,10 @@ ggplot(nyc_tract_shp) +
   labs(title = "% Population with Income Below Poverty Line, ACS 2013-2017")
 ```
 
+We see that Black populations are mostly found in the Bronx and Central Brooklyn, Hispanics in the Bronx and Queen’s, Asians in South Manhattan and Queen’s, college graduates in Manhattan, and poorer communities in the North Manhattan, the Bronx and Central Brooklyn.
+
+This suggests that the most intense presence of the NYPD Stop and Search Programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics
+
 We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
 
 ```{r}
@@ -872,10 +864,7 @@ dim(sqf_data)
 
 # Regression Analysis
 
-For our logistic and penalized regressions, we split our sample in two:
-
-* training data
-* test data
+To get proper analysis of what the most important predictors of arrest are we run a series estimation methods. We do a logit regression, shrinkage estimation and a random forest estimation. To avoid overfitting issues, we split into training, test, and when appropriate validation samples.
 
 We perform this below:
 
@@ -904,6 +893,8 @@ cat("Dimensions of X_test:", dim(X_test), "\n")
 print(table(y_train))
 print(table(y_test))
 ```
+
+For our logistic, lasso and ridge estimators, we split our sample into a training sample, and a test sample at a ratio of 70:30, which is 8370:3587 observations. 
 
 Note that, for each model type, we estimate using two sets of matrices of predictors to test sensitivity of prediction accuracy:
 
@@ -972,16 +963,18 @@ When looking at our confusion matrices, we choose $C=1$ and weight both types of
 
 ## Logistic Regression
 
-Our logistic regression model will serve as a simple baseline model. As it is a simple model, we will use `X_train_subset`, as this is a more conservative approach as we drop the variables that may have occurred before or after arrests. 
+Now the data is prepared, we want to specify the data we will use for our logit model. Our logistic regression model will serve as a simple baseline model. As it is a simple model, we will use `X_train_subset`, as this is a more conservative approach as we drop the variables that may have occurred before or after arrests. 
 
-Since logistic regression is sensitive to multicollinearity, we also drop the factor variables `supervising_officer_rank` as they are closely related to `issuing_officer_rank`, as it is likely issuing_officers of a specific rank have the same rank of supervisors. 
+We use logit because it deals with the classification based structure of predicting a binary random variable. However, this model could struggle with dealing with potential scarcity in the model. It will also struggle with multicollinearity due to the lack of variation in some of the dummy variables.
+
+Since the model is sensitive to multicollinearity, we also drop the factor variables `supervising_officer_rank` as they are closely related to `issuing_officer_rank`, as it is likely issuing_officers of a specific rank have the same rank of supervisors. 
 
 ```{r}
 # Set X_logit, remove supervising_officer_rank to avoid rank-deficient fit 
 X_logit <- X_subset[, !grepl("^(supervising_officer_rank)", colnames(X_subset))]
 ```
 
-Now we set the training and testing split using the X_logit data and run our model. 
+Now we set the training and testing split using the X_logit data and run our model. We generate a confusion matrix, and compute the ROC and AUC.
 
 ```{r}
 # perform train-test split on X_logit
@@ -1042,14 +1035,18 @@ logit_auc <- round(auc(logit_roc), 4)
 cat("AUC for the logit model", logit_auc, "\n")
 ```
 
+Our confusion matrix shows that we have a specificity rate of 78% and a sensitivity rate of 64%. We also have an AUC of 0.775 to 3 significant figures. We care more about the  arrest prediction, and thus sensitivity matter more to us. However, even if the model is less good at predicting arrests, it is still surprisingly good, given the weaknesses of logit with sparcity and multicollinearity. This suggests that whilst sparsity may be a problem, it may not be as serious an issue as we previously thought.
+
 ## LASSO
 
 Next we implement LASSO, where: $$ \beta^{LASSO} = \arg\min_{\beta} \sum_{i=1}^n\Big( y_i - x_i' \beta \Big)^2$$
 subject to  $$  \sum_{j=1}^{p} |\beta_j| < t $$
 
-We implement cross-validation in our training sample as [edit]. We use the default $k=10$ folds for computational efficiency.
+We implement cross-validation in our training sample to ensure each datapoint is used for both for training and testing so that we have a robust estimate of our model’s performance. We use the default $k=10$ folds for computational efficiency.
 
 As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
+
+First we run our full model.
 
 ```{r}
 # run lasso on training data to collect coefficients
@@ -1086,7 +1083,13 @@ lasso_auc_full <- round(auc(lasso_roc_full), 4)
 cat("AUC for the LASSO (full) model", lasso_auc_full, "\n")
 ```
 
+We find an optimal lambda of 0.000925 to 3 significant figures. 
+
+The confusion matrix shows a specificity of 91%, and a sensitivity of 88%, with an AUC of 0.946 to 3 significant figures. 
+
 ### LASSO Sensitivity Analysis - Subset
+
+We then run the LASSO analysis for the subset. This is most comparable to our simple logit regression.
 
 ```{r}
 # run lasso on training data to collect coefficients
@@ -1122,10 +1125,23 @@ lasso_auc_subset <- round(auc(lasso_roc_subset), 4)
 cat("AUC for the LASSO (subset) model", lasso_auc_subset, "\n")
 ```
 
+We find an optimal lambda 0.00706 to 3 significant figures.
+
+The confusion matrix shows a specificity of 75% and a sensitivity 68%, with an AUC of 0.775 to 3 significant figures. This is a modest but clear improvement on the logit model which indicates that the lasso is able to deal with the multicollinearity and sparsity issues more effectively. However, it also suggests that these issues are not particularly important once we drop perfectly multicollinear variables in the logit model.
+
+We find that the model performs a lot less well with the dropped features. What is particularly striking is the fall in the model sensitivity. This suggests that the model becomes a lot less able to predict arrests when we drop variables that are observed during the course of the stop, and potentially after the arrest. There are two potential interpretations of this. Either some of these observations occur after the arrest and hence would engineer predicted arrests. Or certain behaviour and suspicions during the course of the stop lead to officers enacting further measures which uncovers reasons for arrest. A combination of these is the most likely explanation. Hence the improvements from the full model will likely be partly genuine ex-ante predictive improvements.
+
+However, for the purposes of comparison we will principally compare the subset regressions.
+
 ## Ridge
 
 Next, we implement ridge regression: $$ \beta^{Ridge} = \arg\min_{\beta} \sum_{i=1}^n\Big( y_i - x_i' \beta \Big)^2$$
 subject to  $$  \sum_{j=1}^{p} \beta_j^2 < t $$.
+
+This is different from lasso in that the shrinkage will shrink coefficients towards zero but never actually to 0 unlike lasso.
+
+We first run the full ridge regression:
+
 ```{r}
 # run ridge regression on training data to collect coefficients
 ridge <- cv.glmnet(x = X_train, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
@@ -1160,7 +1176,13 @@ ridge_auc_full <- round(auc(ridge_roc_full), 4)
 cat("AUC for the Ridge (full) model:", ridge_auc_full, "\n")
 ```
 
+We find an optimal lambda of 0.0246 to 3 significant figures for our full ridge regression.
+
+The confusion matrix for our full ridge displays a specificity of 90% and a specificity of 89%, with an AUC of 0.946 to 3 significant figures. This suggests that the ridge model is ever so slightly better than LASSO, since it is better able to predict arrests at the cost of a slightly lower specificity.
+
 ### Ridge Sensitivity Analysis - Subset
+
+We then run our ridge regression over our subset matrix.
 
 ```{r}
 # run ridge regression on subset predictors
@@ -1196,11 +1218,19 @@ ridge_auc_subset <- round(auc(ridge_roc_subset), 4)
 cat("AUC for the Ridge (subset) model:", ridge_auc_subset, "\n")
 ```
 
+We find an optimal lambda of 0.156 to 3 significant figures, which is much higher than the previous shrinkage regressions and suggests that this requires more aggressive shrinkage.
+
+The confusion matrix for our ridge subset indicates a specificity of 74% and a sensitivity of 70%, with an AUC of 0.768. Whilst the specificity and sensitivity rates are better, this could be because of our specified C=1, since the AUC is lower than both that of the logit and the LASSO. This suggests that LASSO's property of shrinking sparse estimators to 0, rather than towards 0, like ridge is more effective.
+
+However, the differences between models are still very modest so they suggest they have similar predictive capabilities.
+
 ## Tuned Elastic Net
 
-Now we implement elastic net regression, choosing to tune both $\lambda$ and $\alpha$ [insert justification]. For this, we use our validation data, as mentioned.
+Now we implement a tuned elastic net regression model, choosing to tune for both optimal lambda and alpha to get the optimal weighting between ridge and LASSO models. For this we use our validation data sample as mentioned earlier.
 
-We tune elastic net in the subset of regressors [just subset here i dont think there is need to do full because then we just have to split more, and we are only doing subset for random forest anyway, takes too long]:
+We loop over a defined set of alpha values from 0 to 1, at spacings of 0.1. We then use the validation sample and pick the alpha lambda combination which yields the highest AUC. We then use the testing sample to compute the confusion matrix and AUC for the optimal model.
+
+For computational efficiency, we only run the elastic net regression on the subset:
 
 ```{r}
 # Define alpha values for grid search
@@ -1266,14 +1296,21 @@ en_opt_roc_subset <- roc(response = as.numeric(y_test), predictor = en_opt_predi
 en_opt_auc_subset <- auc(en_opt_roc_subset)
 cat("Test AUC for Tuned Elastic Net model:", en_opt_auc_subset, "\n")
 ```
+We find an optimal alpha of 0.2 and an optimal lambda of 0.0356 to 3 significant figures. This suggests a heavier weighting towards a ridge estimator, which follows the "better" confusion matrix.
+
+We find a specificity of 75% and a sensitivity of 67%, with an AUC of 0.771 to 3 significant figures. This is similar to our previous models, however, it performs less well on the AUC and sensitivity than the LASSO regression, and a lower sensitivity than the Ridge regression.
+
+This is likely due to how we split the training dataset into a training and validation set, and we then run that on the test data. This means that the elastic net model only has half as much training data than our previous models. The fact that it performs similarly well, despite only having half the data, suggests that it would potentially perform even better if it used the same training data as the previous models.
 
 ## Random Forest
 
-Next, we implement the random forest algorithm [justification].
+Next, we implement the random forest algorithm to deal with potential non-linearities in the data, as well as the sparsity that the shrinkage regressions tackle.
 
-We do this on the subset of the data as [justification].
+We do this on the subset of the data as for similar reasons as with our previous regressions. Like with the elastic net, regression we only run the subset for the random forest for computational efficiency since we have two-way hyperparametre optimisation. This also means we use the three-way split of the data into a training sample, validation sample, and testing sample, like with the elastic net.
 
-We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as [elaborate here - mainly computational and want to just simplify the model].
+We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as they provide a good spread of values for a parametre optimisation grid search, whilst preserving computational efficiency.
+
+We runt he random forest regression here:
 
 ```{r}
 # Initialize parameter grid for grid search
@@ -1367,8 +1404,15 @@ generate_cm(
   title = "Confusion Matrix for Random Forest (Subset)"
 )
 ```
+We find an optimal tree length of 100 and an optimal feature inclusion of 18.
+
+We find a specificity rate of 77% and a sensitivity rate of 71%, with an AUC of 0.793 to 3 significant figures. This is better than all of the previous linear models, despite having a similar training dataset issue as with the elastic net estimation. 
+
+This suggests that the random forest model is able to deal with non-linearities in the data that the linear classification models we used previously are not able to deal with. This could be aspects like interaction effects which we do not account for. Police officers may look for patterns in behaviour when arresting someone, for example they may be more likely to arrest tall, heavy, and young black men.
 
 # Results - Comparison
+
+Finally we want to visualise the comparisons of the ROC curves and AUCs for all our regressions.
 
 ```{r}
 # function to plot ROC curves for multiple models
@@ -1470,9 +1514,11 @@ auc_table <- auc_table %>%
 print(auc_table)
 ```
 
-Insert interpretation on relative out of sample predictive performance
+As discussed before, we see how the two full shrinkage regressions perform exceptionally well out of sample, however, this is likely be due to potential results engineering due to some variables being potentially taking place after an arrest. The other ROC curves seem to otherwise be very similar, however, the ROC curve for the random forest estimation clearly stands out as having a better out of sample fit.
 
 ## Variable Importance
+
+We then consider the most important variables in each of the logit and shrinkage regressions:
 
 ```{r}
 # Function to compute and plot variable importance
@@ -1515,7 +1561,19 @@ names(ridge_subset_coeff) <- rownames(coef(ridge_subset, s = ridge_lambda_min_su
 ridge_subset_coeff <- ridge_subset_coeff[-1] 
 ridge_plot <- compute_variable_importance(ridge_subset_coeff, "Ridge Subset")
 print(ridge_plot)
+
+# 4. Elastic Net Subset
+
+en_subset_coeff <- as.numeric(coef(en_opt, s = best_params$optimal_lambda))
+names(en_subset_coeff) <- rownames(coef(en_opt, s = best_params$optimal_lambda))
+en_subset_coeff <- en_subset_coeff[-1]
+en_plot <- compute_variable_importance(en_subset_coeff, "Elastic Net Subset") 
+print(en_plot)
 ```
+
+
+
+Next we consider the most important variables in the random forest estimation:
 
 ```{r}
 # Extract Random Forest importance
