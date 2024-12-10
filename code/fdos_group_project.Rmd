@@ -968,15 +968,13 @@ When looking at our confusion matrices, we choose $C=1$ and weight both types of
 
 ## Logistic Regression
 
-Now the data is prepared, we want to specify the data we will use for our logit model. Our logit model will serve as a simple baseline model. 
+Our logistic regression model will serve as a simple baseline model. As it is a simple model, we will use `X_train_subset`, as this is a more conservative approach as we drop the variables that may have occurred before or after arrests. 
 
-* To create the simple model we will drop variables related to search, frisk, and physical force following the `X_train_subset` conservative approach, as it is unclear if these occurred before or after arrests. 
-
-* We also drop variables that may lead to multicollinearity (`suspect_hair_color` as that may be closely related to race and `supervising_officer_rank` as that may be closely related to `issuing_officer_rank`). 
+Since logistic regression is sensitive to multicollinearity, we also drop the factor variables `supervising_officer_rank` as they are closely related to `issuing_officer_rank`, as it is likely issuing_officers of a specific rank have the same rank of supervisors. 
 
 ```{r}
-# Set X_logit, removing unwanted columns based on the patterns
-X_logit <- X[, !grepl("^(suspected_crime_description|frisked_flag|firearm_flag|knife_cutter_flag|other_weapon_flag|weapon_found_flag|other_contraband_flag|physical_force|search_basis|suspect_eye_color|suspect_hair_color|supervising_officer_rank)", colnames(X))]
+# Set X_logit, remove supervising_officer_rank to avoid rank-deficient fit 
+X_logit <- X_subset[, !grepl("^(supervising_officer_rank)", colnames(X_subset))]
 ```
 
 Now we set the training and testing split using the X_logit data and run our model. 
