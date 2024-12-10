@@ -442,7 +442,8 @@ tail(sqf_data[, c("suspect_height", "suspect_height_feet")])
 
 sqf_data$suspect_height <- sqf_data$suspect_height_feet
 
-
+#drop suspect
+sqf_data <- sqf_data %>% dplyr::select(-suspect_height_feet)
 ```
 
 We now plot the density of height in feet to see the distribution and identify outliers. We are going to drop observations below 4 ft and above 7 ft.
@@ -501,6 +502,7 @@ points(outliers, rep(0, length(outliers)), col = "deeppink", pch = 19)
 sqf_data <- sqf_data[sqf_data$suspect_reported_age >= 10 & sqf_data$suspect_reported_age <= 85, ]
 #Since the `suspect_reported_age` data is quiet skewed, we will perform a logarithmic transformation. 
 sqf_data$suspect_reported_age <- log(sqf_data$suspect_reported_age)
+
 ```
 
 We plot the density of weight to identify outliers. The weight variable is measured in pounds and it appears that some observations could have data entry errors (for example: 9, 16, 760). We will drop outliers above 300 lbs and below 90 lbs.
