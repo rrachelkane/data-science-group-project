@@ -16,11 +16,10 @@ output:
 
 # Abstract
 
-We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest prediction fits best and that it indicated wealth and income factors being the most important predictors of arrest.
+We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest has the best predictive performance out of sample, and that the demographic composition of the census tract in which the stop occurred are important predictors of arrest status.
 
 # Introduction
-For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the NYPD Stop, Question and Frisk Data (https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
-
+For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
 
 * **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator that equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
 
@@ -31,7 +30,7 @@ The stop-and-frisk program has been highly criticized as it does not require evi
 The dataset contains 82 columns, including identifying features, location features, timestamps, continuous features and dummy variables. We keep as many features as relevant, however, we drop certain features such as identifying features, features with a high proportion of NAs, and any “excess” features that become irrelevant after feature engineering and extraction. We then reclassify categorical features into dummy variables. This yields a dataset of 155 features in our full model and 125 in our subset model, which only considers features measurable before the stop. We explore comparisons between a logit regression model, shrinkage estimators, and a random forest. In particular, we exploit the ability of shrinkage estimators and random forests to deal with sparse models. We also run models on test and validation subsets before comparing them across similar test models when comparing the predictive abilities to avoid overfitting.
 
 * **Preliminary Results:**
-Whilst we find that the logit model does a decent job of prediction, it is improved on by shrinkage estimators. Of the shrinkage estimators, the elastic net estimator performs best. In turn the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that racial and wealth based factors are the most important in predicting arrests.
+Whilst we find that the logit model has relatively good predictive performance in the test data, the shrinkage estimators perform better. Of the shrinkage estimators, the tuned elastic net estimator performs best. In turn, the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that demographic factors related to the location of the stop are particularly important when predicting arrest in suspects who are stopped as part of the SQF programme.
 
 # Data Description
 
@@ -92,9 +91,11 @@ colnames(sqf_data)[1:3]
 
 ## Relevant Columns
 
-Data is collected throughout the stop and some variables like `search_base_incident_to_arrest` are observed explicitly **after** an arrest has occurred, whilst others like `suspect_height` are unchanged from before the arrest. Some other variables like `search_flag` are a measure of an activity that may have occurred either before or after a potential arrest. We drop any variables which clearly take place after an arrest, our outcome of interest, since they cannot be used for our prediction question. We maintain unclear variables but address this later.
+Data is collected throughout the stop and some variables like `search_base_incident_to_arrest` are observed explicitly **after** an arrest has occurred, whilst others like `suspect_height` are unchanged from before the arrest.  Some other variables like `search_flag` are a measure of an activity that may have occurred **either before or after** an arrest. 
 
-We drop spatial features other than x and y coordinates of the stop, as this is the most granular spatial information and we use this to map each stop to census tracts to obtain demographic information corresponding to the location of the stop. These dropped spatial features also have high cardinality, which would add many dummies to our model, undermining computational efficiency.
+Here, we drop any variables which clearly take place **after** an arrest, our outcome of interest, since they cannot be used for our prediction question. We maintain unclear variables but address this later, by training and testing the models with both the "full" set of predictors, and then a subset which drops the variables with unclear temporal ordering in relation to arrest.
+
+Here, we also drop spatial features other than x and y coordinates of the stop, as this is the most granular spatial information and we use this to map each stop to census tracts to obtain demographic information corresponding to the location of the stop. These dropped spatial features also have high cardinality, which would add many dummies to our model, undermining computational efficiency.
 
 ```{r}
 sqf_data <- sqf_data %>% 
@@ -548,7 +549,6 @@ summary(sqf_data$suspect_weight)
 
 ```
 
-
 # Exploratory Data Analysis
 
 ## Basic Summary Statistics
@@ -566,7 +566,9 @@ sqf_data %>%
             Pc = N / nrow(sqf_data) * 100) %>% 
   arrange(desc(N)) %>% 
   kable(booktabs = TRUE, col.names = c("Suspect Arrested", "N Stops", "% Total Stops"), align = "l")
+```
 
+```{r}
 # looking at the distribution of sex
 ggplot(sqf_data, aes(x = suspect_sex, fill = suspect_sex)) +
   geom_bar() +
@@ -590,7 +592,11 @@ ggplot(sqf_data, aes(x = suspect_sex, fill = factor(suspect_arrested_flag))) +
   theme_minimal() +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_brewer(type = "qual", palette = "Pastel2", name = "Suspect Arrested") 
+```
 
+We see that the vast majority of stops are conducted on men, however, once stopped women are arrested at a slightly higher rate than men.  
+
+```{r}
 # empirical cdf of age by sex and arrest status
 ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_flag))) +
   stat_ecdf(geom = "step") +
@@ -600,7 +606,11 @@ ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_f
                      name = "Arrest Outcome") +
   labs(x = "Suspect Reported Age", y = "ECDF", title = "Empirical CDF of Suspect Reported Age, By Sex and Arrest Status") +
   theme_minimal()
+```
 
+The empirical CDF shows us that the youngest and oldest men are more likely to be arrested when stopped, especially when compared with women. This suggests that young adult men are “overstopped” relative to how much they should be.
+
+```{r}
 # arrests by race, unstacked
 ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), fill = factor(suspect_arrested_flag))) +
   geom_bar() +
@@ -621,7 +631,11 @@ ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspect_race_description)), f
   ylab("% Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
   labs(title = "Distribution of Arrest Status, By Suspect Race")
+```
 
+In terms of racial components, black and hispanic individuals dominate the number of arrests, however, arrest rates do not differ substantially by race, apart from for Native Americans. This is likely due to the small number of stops of individuals of that race, which could lead to anomalies. 
+
+```{r}
 # arrests by suspected crime description, unstacked
 ggplot(data = sqf_data, aes(x = fct_rev(fct_infreq(suspected_crime_description)), fill = factor(suspect_arrested_flag))) +
   geom_bar() +
@@ -642,7 +656,11 @@ ggplot(data = sqf_data, aes(x = suspected_crime_description, fill = factor(suspe
   ylab("% Stops") +
   scale_fill_brewer(type = "qual", palette = "Pastel1", name = "Suspect Arrested") +
   labs(title = "Distribution of Arrest Status, By Suspect Crime")
+```
 
+The majority of stops occur under suspicion of criminal possession of a weapon (CPW), or for various forms of theft. However, arrests vary by suspected crime with forcible touching and graffiti being those with the highest arrest rates, whilst suspected drug offences appear to have lower arrest rates.
+
+```{r}
 # heatmap of arrests by time of day and borough
 ggplot(
   sqf_data %>%
@@ -668,20 +686,11 @@ ggplot(
 
 ```
 
-We see that the vast majority of stops are conducted on men, however, once stopped women are arrested at a slightly higher rate than men.  
-
-The CDF shows us that the youngest and oldest men are more likely to be arrested when stopped, especially when compared with women. This suggests that young adult men are “overstopped” relative to how much they should be.
-
-In terms of racial components, black and hispanic individuals dominate the number of arrests, however, arrest rates do not differ substantially by race, apart from for Native Americans. This is likely due to the small number of stops of individuals of that race, which could lead to anomalies. 
-
-The majority of stops occur under suspicion of criminal possession of a weapon (CPW), or for various forms of theft. However, arrests vary by suspected crime with forcible touching and graffiti being those with the highest arrest rates, whilst suspected drug offences appear to have lower arrest rates.
-
 The heat map shows us that the arrest rate in the Bronx is substantially lower than in Manhattan and Brooklyn, which in turn is lower than Queens and Staten Island. We also see that arrest rates are lower at evening. This could be because these are the times and areas where the most stop and searches occur and therefore, the arrest rates fall.
 
 ## Spatial Data Visualisation
 
-We also wanted to consider how stops and arrests were distributed across NYC.
-We first clean the data for spatial mapping using the `sf` and `nycgeo` packages. 
+We also wanted to consider how stops and arrests were distributed across NYC. We first clean the data for spatial mapping using the `sf` and `nycgeo` packages. 
 
 We use this to obtain information about the stops at the census tract level, due to its granularity and the availability of population statistics at this level. This will be important for prediction as it will allow us to factor in how police approach specific neighbourhoods that have connotations of low or high-crime. “High-crime” neighbourhoods will likely see more intense policing and more stops which will be associated with a lower arrest rate.
 
@@ -724,7 +733,7 @@ ggplot() +
         legend.title = element_blank())
 ```
 
-It is difficult to make any clear discernations due to the high frequency of stops, however, most stops and arrests appear to occur in a corridor along the Bronx, Manhattan and Brooklyn. Particularly around the Broknx and Central Brooklyn. This would match up with our earlier suggestion that that these areas have a lower arrest rate because they are more heavily policed.
+It is difficult to make any clear discernations due to the high frequency of stops, however, most stops and arrests appear to occur in a corridor along the Bronx, Manhattan and Brooklyn. Particularly around the Bronx and Central Brooklyn. This would match up with our earlier suggestion that that these areas have a lower arrest rate because they are more heavily policed.
 
 ### Tract Level Maps
 
@@ -766,6 +775,7 @@ Additionally, the `nycgeo` package allows us to link with neighbour tabulation a
 We want to use this to be able to see how certain demographic factors are distributed across NYC to see if any potential correlations appear between certain demographic factors, like race.
 
 We visualize those here:
+
 ```{r}
 # we first create the new variables in the shapefile for ease of plotting
 nyc_tract_shp <- nyc_tract_shp %>%
@@ -861,10 +871,11 @@ sqf_data <- sqf_data %>%
 dim(sqf_data)
 ```
 
-
 # Regression Analysis
 
-To get proper analysis of what the most important predictors of arrest are we run a series estimation methods. We do a logit regression, shrinkage estimation and a random forest estimation. To avoid overfitting issues, we split into training, test, and when appropriate validation samples.
+In order to predict arrest status in the SQF data (that is, arrest status conditional on being stopped as part of the SQF programme), we begin by estimating a logistic regression model.
+
+To avoid overfitting issues and to assess out of sample predictive performance, we split the data into training, test, and, when appropriate, validation samples.
 
 We perform this below:
 
@@ -898,9 +909,9 @@ For our logistic, lasso and ridge estimators, we split our sample into a trainin
 
 Note that, for each model type, we estimate using two sets of matrices of predictors to test sensitivity of prediction accuracy:
 
-* the first (`X_train` and `X_test`) simply drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was carried out **after** an arrest. As we are ultimately interested in predicting arrest status ex-ante to the stop from the police officer's perspective [edit]
+* the first (`X_train` and `X_test`) simply drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was definitely carried out **after** an arrest.
 
-* the second set (`X_train_subset` and `X_test_subset`) also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest [edit].
+* the second set (`X_train_subset` and `X_test_subset`) also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest. We are more interesting in estimating the ex-ante likelihood of a stop ending in arrest; namely, the likelihood of a stop ending in arrest, conditional only on the information that a police officer has available to them before the stop begins.
 
 We create this subset below:
 
