@@ -16,10 +16,11 @@ output:
 
 # Abstract
 
-We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest has the best predictive performance out of sample, and that the demographic composition of the census tract in which the stop occurred are important predictors of arrest status.
+We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest prediction fits best and that it indicated wealth and income factors being the most important predictors of arrest.
 
 # Introduction
-For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
+For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the NYPD Stop, Question and Frisk Data (https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
+
 
 * **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator that equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
 
@@ -30,7 +31,7 @@ The stop-and-frisk program has been highly criticized as it does not require evi
 The dataset contains 82 columns, including identifying features, location features, timestamps, continuous features and dummy variables. We keep as many features as relevant, however, we drop certain features such as identifying features, features with a high proportion of NAs, and any “excess” features that become irrelevant after feature engineering and extraction. We then reclassify categorical features into dummy variables. This yields a dataset of 155 features in our full model and 125 in our subset model, which only considers features measurable before the stop. We explore comparisons between a logit regression model, shrinkage estimators, and a random forest. In particular, we exploit the ability of shrinkage estimators and random forests to deal with sparse models. We also run models on test and validation subsets before comparing them across similar test models when comparing the predictive abilities to avoid overfitting.
 
 * **Preliminary Results:**
-Whilst we find that the logit model has relatively good predictive performance in the test data, the shrinkage estimators perform better. Of the shrinkage estimators, the tuned elastic net estimator performs best. In turn, the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that demographic factors related to the location of the stop are particularly important when predicting arrest in suspects who are stopped as part of the SQF programme.
+Whilst we find that the logit model does a decent job of prediction, it is improved on by shrinkage estimators. Of the shrinkage estimators, the elastic net estimator performs best. In turn the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that racial and wealth based factors are the most important in predicting arrests.
 
 # Data Description
 
@@ -686,7 +687,7 @@ ggplot(
 
 ```
 
-The heat map shows us that the arrest rate in the Bronx is substantially lower than in Manhattan and Brooklyn, which in turn is lower than Queens and Staten Island. We also see that arrest rates are lower at evening. This could be because these are the times and areas where the most stop and searches occur and therefore, the arrest rates fall.
+The heat map shows us that the arrest rate in the Bronx is substantially lower than in Manhattan and Brooklyn, which in turn is lower than Queens and Staten Island. We also see that arrest rates are lower at evening. This could be because these are the times and areas where the most stop and searches occur and therefore, the arrest rates fall because the increase in the number of stops outstrips the increase in arrests.
 
 ## Spatial Data Visualisation
 
@@ -840,7 +841,7 @@ ggplot(nyc_tract_shp) +
   labs(title = "% Population with Income Below Poverty Line, ACS 2013-2017")
 ```
 
-We see that Black populations are mostly found in the Bronx and Central Brooklyn, Hispanics in the Bronx and Queen’s, Asians in South Manhattan and Queen’s, college graduates in Manhattan, and poorer communities in the North Manhattan, the Bronx and Central Brooklyn.
+We see that Black populations are mostly found in the Bronx, Central Brooklyn, and South Queen's; Hispanics in the Bronx and North Queen’s; Asians in South Manhattan and North Queen’s; college graduates in Manhattan; and poorer communities in North Manhattan, the Bronx and Central Brooklyn.
 
 This suggests that the most intense presence of the NYPD Stop and Search Programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics
 
@@ -905,11 +906,11 @@ print(table(y_train))
 print(table(y_test))
 ```
 
-For our logistic, lasso and ridge estimators, we split our sample into a training sample, and a test sample at a ratio of 70:30, which is 8370:3587 observations. 
+For our logistic, lasso and ridge estimators, we split our sample into a training sample, and a test sample at a ratio of 70:30, which is 8370:3587 at the observation level. 
 
 Note that, for each model type, we estimate using two sets of matrices of predictors to test sensitivity of prediction accuracy:
 
-* the first (`X_train` and `X_test`) simply drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was definitely carried out **after** an arrest.
+* the first (`X_train` and `X_test`) simply drops `stop_id`, due to its irrelevance for prediction, and also  `search_basis_incidental_to_arrest_flag`, as this indicates a search was carried out **after** an arrest.
 
 * the second set (`X_train_subset` and `X_test_subset`) also drops all further variables related to search, frisk and physical force. We drop these for a conservative approach to prediction, as it is unclear when these occur in relation to the arrest. We are more interesting in estimating the ex-ante likelihood of a stop ending in arrest; namely, the likelihood of a stop ending in arrest, conditional only on the information that a police officer has available to them before the stop begins.
 
@@ -970,7 +971,7 @@ Note that as we are working in a binary classification setting, we are looking t
 
 This measures how costly false negatives are relative to false positives. The optimal decision is $$\hat{y_i} = 1 \iff p_i > {1 \over 1+C}$$
 
-When looking at our confusion matrices, we choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$.
+When looking at our confusion matrices, we choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$. We do this despite caring more about correctly predicting arrests. Our preferred model, will be the model with the highest Area Under the ROC Curve (AUC), which accounts for all potential values og $C$.
 
 ## Logistic Regression
 
@@ -1046,7 +1047,7 @@ logit_auc <- round(auc(logit_roc), 4)
 cat("AUC for the logit model", logit_auc, "\n")
 ```
 
-Our confusion matrix shows that we have a specificity rate of 78% and a sensitivity rate of 64%. We also have an AUC of 0.775 to 3 significant figures. We care more about the  arrest prediction, and thus sensitivity matter more to us. However, even if the model is less good at predicting arrests, it is still surprisingly good, given the weaknesses of logit with sparcity and multicollinearity. This suggests that whilst sparsity may be a problem, it may not be as serious an issue as we previously thought.
+Our confusion matrix shows that we have a specificity rate of 78% and a sensitivity rate of 64%. We also have an AUC of 0.775 to 3 significant figures. We care more about the  arrest prediction, and thus sensitivity matter more to us, at equivalent AUC. However, even if the model is less good at predicting arrests, it is still surprisingly good, given the weaknesses of logit with sparcity and multicollinearity. This suggests that whilst sparsity may be a problem, it may not be as serious an issue as we previously thought.
 
 ## LASSO
 
@@ -1100,7 +1101,7 @@ The confusion matrix shows a specificity of 91%, and a sensitivity of 88%, with 
 
 ### LASSO Sensitivity Analysis - Subset
 
-We then run the LASSO analysis for the subset. This is most comparable to our simple logit regression.
+We then run the LASSO analysis for the subset. This is most comparable to our simple logit regression in the data it uses.
 
 ```{r}
 # run lasso on training data to collect coefficients
@@ -1239,7 +1240,7 @@ However, the differences between models are still very modest so they suggest th
 
 Now we implement a tuned elastic net regression model, choosing to tune for both optimal lambda and alpha to get the optimal weighting between ridge and LASSO models. For this we use our validation data sample as mentioned earlier.
 
-We loop over a defined set of alpha values from 0 to 1, at spacings of 0.1. We then use the validation sample and pick the alpha lambda combination which yields the highest AUC. We then use the testing sample to compute the confusion matrix and AUC for the optimal model.
+We loop over a defined set of alpha values from 0 to 1, at spacings of 0.1, due to computational efficiency. We then use the validation sample and pick the alpha lambda combination which yields the highest AUC. We then use the testing sample to compute the confusion matrix and AUC for the optimal model.
 
 For computational efficiency, we only run the elastic net regression on the subset:
 
@@ -1321,7 +1322,7 @@ We do this on the subset of the data as for similar reasons as with our previous
 
 We tune the maximum number features of the tree first. We want to refine the maximum number of features to simplify the model. We choose the maximum number of features to loop over as $m = 20$ and $ntree \in {50, 100, 150}$, as they provide a good spread of values for a parametre optimisation grid search, whilst preserving computational efficiency.
 
-We runt he random forest regression here:
+We run the random forest regression here:
 
 ```{r}
 # Initialize parameter grid for grid search
@@ -1525,11 +1526,13 @@ auc_table <- auc_table %>%
 print(auc_table)
 ```
 
-As discussed before, we see how the two full shrinkage regressions perform exceptionally well out of sample, however, this is likely be due to potential results engineering due to some variables being potentially taking place after an arrest. The other ROC curves seem to otherwise be very similar, however, the ROC curve for the random forest estimation clearly stands out as having a better out of sample fit.
+As discussed before, we see how the two full shrinkage regressions perform exceptionally well out of sample, however, this is likely be due to potential results engineering due to some variables being potentially taking place after an arrest. The other ROC curves seem to otherwise be very similar, however, the ROC curve for the random forest estimation clearly stands out as having a better out of sample fit, compared to its peers.
 
 ## Variable Importance
 
-We then consider the most important variables in each of the logit and shrinkage regressions:
+We then consider the most important variables in each of the logit and shrinkage regressions. An important point to note is that we scale the importance of these variables, so that the most important variable has an importance of 1, and the least important 0. Therefore, a scaled importance of 1 is **NOT** indicative of the problem of multicollinearity (not perfect multicollinearity) or overfitting, it is an indication of relative importance.
+
+We show our results here:
 
 ```{r}
 # Function to compute and plot variable importance
@@ -1581,8 +1584,9 @@ en_subset_coeff <- en_subset_coeff[-1]
 en_plot <- compute_variable_importance(en_subset_coeff, "Elastic Net Subset") 
 print(en_plot)
 ```
+We see that the logistic curve classifies dummies indicating the rank of the officer conducting the stop as the most important variables in predicting arrest, with certain suspected crimes also being highly predictive. The latter makes sense, as for it is easy to understand why on certain crimes like terrorism, the police would err on the side of caution and arrest a stopped subject. It is also easy to understand why certain very specific crimes, like criminal posession of a forges instrument, might only lead to stops when the threshhold for arrest has already been surpassed.
 
-
+On the side of the shrinkage estimators a couple key factors show up in each of the three types of predictors. The `officer_explained_stop_flag` is a very high predictor and it suggests that an officer explaining why a suspect has been stopped means there is good evidence for the suspect to be arrested and the officer is following protocol to avoid potential legal complications. We also see certain crime and officer rank dummies featuring highly. Their presence would be explained by the same explanation as with the logit estimator.
 
 Next we consider the most important variables in the random forest estimation:
 
@@ -1605,11 +1609,15 @@ ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20)
        y = "Scaled Importance") +
   theme_minimal()
 ```
+In the random forest model, we still see the `officer_explained_stop_flag` as being relatively important, along with certain suspected crime dummies, however, these features are a lot less important than in the linear models we explored earlier. What we see here as being most important are demographic dummies describing a neighbourhood's racial composition and level of education. This suggests that the percentage of a neighbourhood in poverty, with a Bachelor's degree, or who are Hispanic are the best predictors of arrest. This is more supportive of the initial assessment that demographic characteristics play an important role in how the police police different neighbourhoods. This would be supportive of the suggestion that the NYPD have some level of racial bias in how they approach these stops.
 
-Insert interpretation on importance
 
 # Conclusion
 
-summary, racial component?
+Our analysis of the NYPD's stop-and-frisk programme in 2023 indicates that the prediction of whether a police officer makes an arrest is best explained by a random forest. Our random forest model, performs modestly but decisively better than both the shrinkage and logit estimators. This suggests that the process by which a stop turns into an arrest is both modestly sparse and non-linear, which is why the random forest is able to perform better. 
 
-note limitations of our analysis, possible extensions
+Our initial exploration of the dataset's descriptive statistics and the random forest model indicates that racial bias plays an important role both in how the police, approach the stop-and-frisk programme and in how they make their arrests. There appears to be a two-way effect. Our exploratory analysis suggests that the police have a more intense present in poorer neighbourhoods disproportionately inhabited by ethnic minorities. Therefore, the random forest suggests that when they make a stop in a more affluent and educated neighbourhood there is more reason to arrest the person. On the other hand the high predictive importance of racial and income components in the random forest indicates that the police are both more present in these neighbourhoods and more willing to arrest stopped individuals in them. These individuals are dispropotionately poorer ethnic minorities.
+
+A potential extension to this model would be to attempt to fit the "full" regression model to both the random forest and the tuned elastic net. This would be viable with more computing power, and it would be a useful extension to see whether the random forest was robust to adding new variables. We could also attempt to fit the models on previous years stop-and-frisk data to see if their out-of-sample goodness of fit extended to other years' data.
+
+Despite, having a large dataset of over 10000 observations, even after our dataset undergoes significant cleaning and feature engineering, our dataset still exhibits a high degree of granularity due to the large number of predictors. Therefore, it is unsurprising that some of these predictors exhibit little to no variation. We can see this in the chart showing the percentage of "nulls" in each feature, since many of these "nulls" are actually zeros.This lack of variation is also clear in some of the spacial features, as we can see that not all localities in the map have an arrest percentage to report in our exploratory analysis. Whilst, we drop multicollinear variables for our logit model, and shrinkage estimators and the random forest are designed to be more robust to a lack of variation in features, there could still be some issues with overfitting due to the sheer number of features with limited variation.
