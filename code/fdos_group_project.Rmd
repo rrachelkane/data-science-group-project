@@ -1047,7 +1047,7 @@ logit_auc <- round(auc(logit_roc), 4)
 cat("AUC for the logit model", logit_auc, "\n")
 ```
 
-Our confusion matrix shows that we have a specificity rate of 78% and a sensitivity rate of 64%. We also have an AUC of 0.775 to 3 significant figures. We care more about the  arrest prediction, and thus sensitivity matter more to us, at equivalent AUC. However, even if the model is less good at predicting arrests, it is still surprisingly good, given the weaknesses of logit with sparcity and multicollinearity. This suggests that whilst sparsity may be a problem, it may not be as serious an issue as we previously thought.
+Our confusion matrix shows that we have a specificity rate of 78% and a sensitivity rate of 64%. We also have an AUC of 0.775 to 3 significant figures. We care more about the  arrest prediction, and thus sensitivity matter more to us, at equivalent AUC. However, even if the model is relatively less good at predicting arrests, it is still surprisingly good, given the weaknesses of logit with sparcity and multicollinearity. This suggests that whilst sparsity may be a problem, it may not be as serious an issue as we previously thought.
 
 ## LASSO
 
@@ -1095,7 +1095,7 @@ lasso_auc_full <- round(auc(lasso_roc_full), 4)
 cat("AUC for the LASSO (full) model", lasso_auc_full, "\n")
 ```
 
-We find an optimal lambda of 0.000925 to 3 significant figures. 
+We find an optimal lambda of 0.00283 to 3 significant figures. 
 
 The confusion matrix shows a specificity of 91%, and a sensitivity of 88%, with an AUC of 0.946 to 3 significant figures. 
 
@@ -1138,9 +1138,9 @@ lasso_auc_subset <- round(auc(lasso_roc_subset), 4)
 cat("AUC for the LASSO (subset) model", lasso_auc_subset, "\n")
 ```
 
-We find an optimal lambda 0.00706 to 3 significant figures.
+We find an optimal lambda 0.00175 to 3 significant figures.
 
-The confusion matrix shows a specificity of 75% and a sensitivity 68%, with an AUC of 0.775 to 3 significant figures. This is a modest but clear improvement on the logit model which indicates that the lasso is able to deal with the multicollinearity and sparsity issues more effectively. However, it also suggests that these issues are not particularly important once we drop perfectly multicollinear variables in the logit model.
+The confusion matrix shows a specificity of 77% and a sensitivity 66%, with an AUC of 0.777 to 3 significant figures. This is a modest  improvement on the logit model which indicates that the lasso is able to deal with the mild multicollinearity and sparsity issues more slightly more effectively. However, it also suggests that these issues are not particularly important once we drop perfectly multicollinear variables in the logit model.
 
 We find that the model performs a lot less well with the dropped features. What is particularly striking is the fall in the model sensitivity. This suggests that the model becomes a lot less able to predict arrests when we drop variables that are observed during the course of the stop, and potentially after the arrest. There are two potential interpretations of this. Either some of these observations occur after the arrest and hence would engineer predicted arrests. Or certain behaviour and suspicions during the course of the stop lead to officers enacting further measures which uncovers reasons for arrest. A combination of these is the most likely explanation. Hence the improvements from the full model will likely be partly genuine ex-ante predictive improvements.
 
@@ -1232,11 +1232,11 @@ ridge_auc_subset <- round(auc(ridge_roc_subset), 4)
 cat("AUC for the Ridge (subset) model:", ridge_auc_subset, "\n")
 ```
 
-We find an optimal lambda of 0.156 to 3 significant figures, which is much higher than the previous shrinkage regressions and suggests that this requires more aggressive shrinkage.
+We find an optimal lambda of 0.0126 to 3 significant figures, which is much higher than the previous shrinkage regressions and suggests that this requires more aggressive shrinkage.
 
-The confusion matrix for our ridge subset indicates a specificity of 74% and a sensitivity of 70%, with an AUC of 0.768. Whilst the specificity and sensitivity rates are better, this could be because of our specified C=1, since the AUC is lower than both that of the logit and the LASSO. This suggests that LASSO's property of shrinking sparse estimators to 0, rather than towards 0, like ridge is more effective.
+The confusion matrix for our ridge subset indicates a specificity of 77% and a sensitivity of 66%, with an AUC of 0.775 to 3 significant figures. Whilst the specificity and sensitivity rates are the same as in LASSO, this could be because of our specified C=1, since the AUC is lower than the LASSO regression. This suggests that LASSO's property of shrinking sparse estimators to 0, rather than towards 0, like ridge is more effective.
 
-However, the differences between models are still very modest so they suggest they have similar predictive capabilities.
+However, the differences between models are still very modest so this suggests that they have similar predictive capabilities.
 
 ## Tuned Elastic Net
 
@@ -1310,9 +1310,9 @@ en_opt_roc_subset <- roc(response = as.numeric(y_test), predictor = en_opt_predi
 en_opt_auc_subset <- auc(en_opt_roc_subset)
 cat("Test AUC for Tuned Elastic Net model:", en_opt_auc_subset, "\n")
 ```
-We find an optimal alpha of 0.2 and an optimal lambda of 0.0356 to 3 significant figures. This suggests a heavier weighting towards a ridge estimator, which follows the "better" confusion matrix.
+We find an optimal alpha of 0.3 and an optimal lambda of 0.0216 to 3 significant figures. This suggests a heavier weighting towards a ridge estimator, which follows the "better" confusion matrix.
 
-We find a specificity of 75% and a sensitivity of 67%, with an AUC of 0.771 to 3 significant figures. This is similar to our previous models, however, it performs less well on the AUC and sensitivity than the LASSO regression, and a lower sensitivity than the Ridge regression.
+We find a specificity of 75% and a sensitivity of 67%, with an AUC of 0.771 to 3 significant figures. This is similar to our previous models, however, it performs less well on the AUC than any of the other models. It's sensitivity is slightly better, however, its specificity is slightly worse than the other shrinkage models. 
 
 This is likely due to how we split the training dataset into a training and validation set, and we then run that on the test data. This means that the elastic net model only has half as much training data than our previous models. The fact that it performs similarly well, despite only having half the data, suggests that it would potentially perform even better if it used the same training data as the previous models.
 
@@ -1586,9 +1586,9 @@ en_subset_coeff <- en_subset_coeff[-1]
 en_plot <- compute_variable_importance(en_subset_coeff, "Elastic Net Subset") 
 print(en_plot)
 ```
-We see that the logistic curve classifies dummies indicating the rank of the officer conducting the stop as the most important variables in predicting arrest, with certain suspected crimes also being highly predictive. The latter makes sense, as for it is easy to understand why on certain crimes like terrorism, the police would err on the side of caution and arrest a stopped subject. It is also easy to understand why certain very specific crimes, like criminal posession of a forges instrument, might only lead to stops when the threshhold for arrest has already been surpassed.
+We see that the logistic curve classifies dummies indicating the rank of the officer conducting the stop as the most important variables in predicting arrest, with certain suspected crimes also being highly predictive. The latter makes sense, as for it is easy to understand why on certain crimes like terrorism, the police would err on the side of caution and arrest a stopped subject. It is also easy to understand why certain very specific crimes, like criminal posession of a forged instrument, might only lead to stops when the threshhold for arrest has already been surpassed.
 
-On the side of the shrinkage estimators a couple key factors show up in each of the three types of predictors. The `officer_explained_stop_flag` is a very high predictor and it suggests that an officer explaining why a suspect has been stopped means there is good evidence for the suspect to be arrested and the officer is following protocol to avoid potential legal complications. We also see certain crime and officer rank dummies featuring highly. Their presence would be explained by the same explanation as with the logit estimator.
+On the side of the shrinkage estimators a couple key factors show up in each of the three types of predictors. The `officer_explained_stop_flag` is a very important predictor and it suggests that an officer explaining why a suspect has been stopped means there is good evidence for the suspect to be arrested and the officer is following protocol to avoid potential legal complications. We also see certain crime and officer rank dummies featuring highly. Their presence would be explained by the same explanation as with the logit estimator.
 
 Next we consider the most important variables in the random forest estimation:
 
@@ -1611,6 +1611,7 @@ ggplot(rf_importance_subset %>% arrange(desc(Scaled_Importance)) %>% slice(1:20)
        y = "Scaled Importance") +
   theme_minimal()
 ```
+
 In the random forest model, we still see the `officer_explained_stop_flag` as being relatively important, along with certain suspected crime dummies, however, these features are a lot less important than in the linear models we explored earlier. What we see here as being most important are demographic dummies describing a neighbourhood's racial composition and level of education. This suggests that the percentage of a neighbourhood in poverty, with a Bachelor's degree, or who are Hispanic are the best predictors of arrest. This is more supportive of the initial assessment that demographic characteristics play an important role in how the police police different neighbourhoods. This would be supportive of the suggestion that the NYPD have some level of racial bias in how they approach these stops.
 
 
