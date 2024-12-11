@@ -843,7 +843,7 @@ ggplot(nyc_tract_shp) +
 
 We see that Black populations are mostly found in the Bronx, Central Brooklyn, and South Queen's; Hispanics in the Bronx and North Queen’s; Asians in South Manhattan and North Queen’s; college graduates in Manhattan; and poorer communities in North Manhattan, the Bronx and Central Brooklyn.
 
-This suggests that the most intense presence of the NYPD Stop and Search Programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics. 
+This suggests that the most intense presence of the NYPD Stop and Search programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics. 
 
 We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
 
