@@ -931,7 +931,7 @@ cat("Dimensions of X_train_subset:", dim(X_train_subset), "\n")
 cat("Dimensions of X_test_subset:", dim(X_test_subset), "\n")
 ```
 
-Next, note that we also require a **validation** dataset for our tuning of hyperparameters in our tuned elastic net and random forest models.
+Next, note that we also require a **validation** dataset for our tuning of hyperparametres in our tuned elastic net and random forest models.
 
 For this reason, we split `X_train_subset` further into:
 
@@ -1056,7 +1056,7 @@ subject to  $$  \sum_{j=1}^{p} |\beta_j| < t $$
 
 We implement cross-validation in our training sample to ensure each datapoint is used for both for training and testing so that we have a robust estimate of our model’s performance. We use the default $k=10$ folds for computational efficiency.
 
-As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "auc"` in our cv.glmnet regressions.
+As we are operating in a classification setting, we choose the value of the parametre lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "auc"` in our cv.glmnet regressions.
 
 First we run our full model.
 
@@ -1287,7 +1287,7 @@ cat("Optimal alpha:", best_params$alpha, "\n")
 cat("Optimal lambda:", best_params$optimal_lambda, "\n")
 cat("Best AUC:", best_params$auc, "\n")
 
-# train the tuned elastic net model with best hyperparameters
+# train the tuned elastic net model with best hyperparametres
 en_opt <- glmnet(
   x = X_train_subset_final,
   y = y_train_final,
@@ -1327,7 +1327,7 @@ We tune the maximum number features of the tree first. We want to refine the max
 We run the random forest regression here:
 
 ```{r}
-# Initialize parameter grid for grid search
+# Initialize parametre grid for grid search
 ntrees <- seq(50, 150, 50)  # range of trees to tune over
 max_features_range <- 1:20  # Range of mtry  (max features) to tune over
 
@@ -1369,7 +1369,7 @@ for (i in 1:nrow(results)) {
   results$test_acc[i] <- mean(y_val == as.numeric(levels(y_pred_val)[y_pred_val]))
 }
 
-# identify the optimal parameters
+# identify the optimal parametres
 best_params <- results[which.max(results$test_acc), ]
 cat("Optimal ntree:", best_params$ntree, "\n")
 cat("Optimal mtry:", best_params$mtry, "\n")
@@ -1392,7 +1392,7 @@ legend('bottomright',
        col = c('blue', 'red', 'green'), lty = c(1, 1, 2), bty = 'n')
 
 
-# given optimal parameters, train using training data to get tuned model
+# given optimal parametres, train using training data to get tuned model
 RFTuned <- randomForest(
   x = X_train_subset_final,
   y = factor(y_train_final),
@@ -1400,7 +1400,7 @@ RFTuned <- randomForest(
   ntree = best_params$ntree
 )
 
-# using model trained with optimal parameters, predict with TEST data
+# using model trained with optimal parametres, predict with TEST data
 RFPred <- predict(RFTuned, newdata = X_test_subset)
 
 # compute associated relevant fitted probabilities
