@@ -16,7 +16,7 @@ output:
 
 # Abstract
 
-We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest model fits best in the test data, and that it indicated demographic factors, both related to the individual and the census tract in which they were stopped, were the most important predictors of arrest.
+We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest model fits best in the test data, and it indicated demographic factors, both related to the individual and the census tract in which they were stopped, were the most important predictors of arrest.
 
 # Introduction
 For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis.We use this data from 2023 which can be found in the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
@@ -609,7 +609,7 @@ ggplot(sqf_data, aes(x = suspect_reported_age, color = factor(suspect_arrested_f
   theme_minimal()
 ```
 
-The empirical CDF shows us that the youngest and oldest men are more likely to be arrested when stopped, especially when compared with women. This suggests that young adult men are “overstopped” relative to how much they should be.
+The empirical CDF shows us that the youngest and oldest men are more likely to be arrested when stopped, especially when compared with women. This suggests that young adult men are “overstopped” relative to how much they should be. For reference, before conducting our logarithmic transformation and normalizing `suspect_reported_age`, we found the mean age of females and males was 30 and 27 years, respectively.
 
 ```{r}
 # arrests by race, unstacked
@@ -734,7 +734,7 @@ ggplot() +
         legend.title = element_blank())
 ```
 
-It is difficult to make any clear discernations due to the high frequency of stops, however, most stops and arrests appear to occur in a corridor along the Bronx, Manhattan and Brooklyn. Particularly around the Bronx and Central Brooklyn. This would match up with our earlier suggestion that that these areas have a lower arrest rate because they are more heavily policed.
+It is difficult to make any clear discernations due to the high frequency of stops, however, most stops and arrests appear to occur in a corridor along the Bronx, Manhattan and Brooklyn (particularly around the Bronx and Central Brooklyn). This would match up with our earlier suggestion that that these areas have a lower arrest rate because they are more heavily policed.
 
 ### Tract Level Maps
 
@@ -817,7 +817,7 @@ ggplot(nyc_tract_shp) +
     option = "inferno"
   ) +
   theme_void() +
-  labs(title = "Non-hispanic Asian  Population by Census Tract, ACS 2013-2017")
+  labs(title = "Non-hispanic Asian Population by Census Tract, ACS 2013-2017")
 
 # pop age 25 years or older with at least bachelors degree
 ggplot(nyc_tract_shp) +
@@ -843,7 +843,7 @@ ggplot(nyc_tract_shp) +
 
 We see that Black populations are mostly found in the Bronx, Central Brooklyn, and South Queen's; Hispanics in the Bronx and North Queen’s; Asians in South Manhattan and North Queen’s; college graduates in Manhattan; and poorer communities in North Manhattan, the Bronx and Central Brooklyn.
 
-This suggests that the most intense presence of the NYPD Stop and Search Programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics
+This suggests that the most intense presence of the NYPD Stop and Search Programme occurs in poorer neighbourhoods disproportionately inhabited by Black and Hispanic inhabitants. This suggests that the NYPD is disproportionately present in these areas and it is evidence for potential racial bias. However, to be more certain of this we would need data on crime statistics. 
 
 We keep only these predictors from the ACS data as predictors for our analysis, as shown below.
 
@@ -971,11 +971,11 @@ Note that as we are working in a binary classification setting, we are looking t
 
 This measures how costly false negatives are relative to false positives. The optimal decision is $$\hat{y_i} = 1 \iff p_i > {1 \over 1+C}$$
 
-When looking at our confusion matrices, we choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$. We do this despite caring more about correctly predicting arrests. Our preferred model, will be the model with the highest Area Under the ROC Curve (AUC), which accounts for all potential values og $C$.
+When looking at our confusion matrices, we choose $C=1$ and weight both types of misclassification equally, and so classify according to the most likely class i.e $$p_i > 0.5 \longrightarrow \hat{y} = 1$$. We do this despite caring more about correctly predicting arrests. Our preferred model, will be the model with the highest Area Under the ROC Curve (AUC), which accounts for all potential values of $C$.
 
 ## Logistic Regression
 
-Now the data is prepared, we want to specify the data we will use for our logit model. Our logistic regression model will serve as a simple baseline model. As it is a simple model, we will use `X_train_subset`, as this is a more conservative approach as we drop the variables that may have occurred before or after arrests. 
+Now the data is prepared, we want to specify the data we will use for our logit model. Our logistic regression model will serve as a simple baseline model. As it is a simple model, we will use `X_train_subset`, as this is a more conservative approach since we drop the variables that we are unclear happened before or after arrests.
 
 We use logit because it deals with the classification based structure of predicting a binary random variable. However, this model could struggle with dealing with potential scarcity in the model. It will also struggle with multicollinearity due to the lack of variation in some of the dummy variables.
 
