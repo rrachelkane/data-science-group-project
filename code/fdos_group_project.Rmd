@@ -16,10 +16,10 @@ output:
 
 # Abstract
 
-We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest prediction fits best and that it indicated wealth and income factors being the most important predictors of arrest.
+We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest model fits best in the test data, and that it indicated demographic factors, both related to the individual and the census tract in which they were stopped, were the most important predictors of arrest.
 
 # Introduction
-For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis. We use this data from 2023 which can be found in the NYPD Stop, Question and Frisk Data (https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
+For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis.We use this data from 2023 which can be found in the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
 
 
 * **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator that equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
@@ -1056,24 +1056,24 @@ subject to  $$  \sum_{j=1}^{p} |\beta_j| < t $$
 
 We implement cross-validation in our training sample to ensure each datapoint is used for both for training and testing so that we have a robust estimate of our model’s performance. We use the default $k=10$ folds for computational efficiency.
 
-As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "class"` in our cv.glmnet regressions.
+As we are operating in a classification setting, we choose the value of the parameter lambda that maximises the area under the ROC curve, and implement this by selecting `type.measure = "auc"` in our cv.glmnet regressions.
 
 First we run our full model.
 
 ```{r}
 # run lasso on training data to collect coefficients
-lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "class")
+lasso <- cv.glmnet(x=X_train, y=y_train, alpha = 1, family="binomial", type.measure = "auc")
 
 # optimal lambda
 lasso_lambda_min <- lasso$lambda.min
 cat("Optimal Lambda for Lasso:", lasso_lambda_min, "\n")
 
-# plot misclassification error against log lambda
+# plot auc against log lambda
 plot(lasso)
 abline(v = log(lasso_lambda_min), col = "red", lwd = 2, lty = 2)
-title(main = "Cross-Validation Misclassification Error (LASSO - Full)",
+title(main = "Cross-Validation AUC (LASSO - Full)",
       sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+      xlab = "Log(Lambda)", ylab = "AUC")
 
 # plot coefficients
 plot(lasso$glmnet.fit, xvar = "lambda", label = TRUE)
@@ -1105,17 +1105,18 @@ We then run the LASSO analysis for the subset. This is most comparable to our si
 
 ```{r}
 # run lasso on training data to collect coefficients
-lasso_subset <- cv.glmnet(x=X_train_subset, y=y_train, alpha = 1, family="binomial", type.measure = "class")
+lasso_subset <- cv.glmnet(x=X_train_subset, y=y_train, alpha = 1, family="binomial", type.measure = "auc")
 
 lasso_lambda_min_subset <- lasso_subset$lambda.min
 cat("Optimal Lambda for Lasso (Subset):", lasso_lambda_min_subset, "\n")
 
-# plot misclassification error against log lambda
+# plot auc against log lambda
 plot(lasso_subset)
 abline(v = log(lasso_lambda_min_subset), col = "red", lwd = 2, lty = 2)
-title(main = "Cross-Validation Misclassification Error (LASSO - Subset)",
+title(main = "Cross-Validation AUC (LASSO - Subset)",
       sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+      xlab = "Log(Lambda)", ylab = "AUC")
+
 
 # plot coefficients
 plot(lasso_subset$glmnet.fit, xvar = "lambda", label = TRUE)
@@ -1156,17 +1157,18 @@ We first run the full ridge regression:
 
 ```{r}
 # run ridge regression on training data to collect coefficients
-ridge <- cv.glmnet(x = X_train, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
+ridge <- cv.glmnet(x = X_train, y = y_train, alpha = 0, family = "binomial", type.measure = "auc")
 
 ridge_lambda_min <- ridge$lambda.min
 cat("optimal lambda for ridge:", ridge_lambda_min, "\n")
 
-# plot misclassification error against log lambda
+# plot auc against log lambda
 plot(ridge)
 abline(v = log(ridge_lambda_min), col = "red", lwd = 2, lty = 2)
-title(main = "Cross-Validation Misclassification Error (Ridge - Full)",
+title(main = "Cross-Validation AUC (Ridge - Full)",
       sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+      xlab = "Log(Lambda)", ylab = "AUC")
+
 
 # plot coefficients
 plot(ridge$glmnet.fit, xvar = "lambda", label = TRUE)
@@ -1198,17 +1200,17 @@ We then run our ridge regression over our subset matrix.
 
 ```{r}
 # run ridge regression on subset predictors
-ridge_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0, family = "binomial", type.measure = "class")
+ridge_subset <- cv.glmnet(x = X_train_subset, y = y_train, alpha = 0, family = "binomial", type.measure = "auc")
 
 ridge_lambda_min_subset <- ridge_subset$lambda.min
 cat("Optimal lambda for ridge (subset):", ridge_lambda_min_subset, "\n")
 
-# plot misclassification error against log lambda
+# plot auc against log lambda
 plot(ridge_subset)
 abline(v = log(ridge_lambda_min_subset), col = "red", lwd = 2, lty = 2)
-title(main = "Cross-Validation Misclassification Error (Ridge - Subset)",
+title(main = "Cross-Validation AUC (Ridge - Subset)",
       sub = "Optimal Lambda Highlighted in Red",
-      xlab = "Log(Lambda)", ylab = "Misclassification Error")
+      xlab = "Log(Lambda)", ylab = "AUC")
 
 # plot coefficients
 plot(ridge_subset$glmnet.fit, xvar = "lambda", label = TRUE)
@@ -1261,7 +1263,7 @@ for (i in 1:nrow(results)) {
     y = y_train_final,
     alpha = alpha_i,
     family = "binomial",
-    type.measure = "class"
+    type.measure = "auc"
   )
   
   # get the best lambda for the current alpha
