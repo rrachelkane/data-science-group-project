@@ -19,8 +19,7 @@ output:
 We use 2023 data from the New York City Police Department’s (NYPD) stop-and-frisk program. The dataset almost entirely consists of dummy and categorical variables, however there are three continuous variables (height, weight, and age), and a timestamp variable. The dataset requires significant cleaning due to inconsistencies in the usage of N/A and null entries. The use of timestamps requires feature engineering to convert it into relevant categorical variables, and control for seasonality. Finally, continuous variables also require feature engineering. We aim to predict arrests using several different classification estimation methods. We fit and compare a logit estimation, different forms of shrinkage regressions, and a random forest estimation. We find that the random forest model fits best in the test data, and it indicated demographic factors, both related to the individual and the census tract in which they were stopped, were the most important predictors of arrest.
 
 # Introduction
-For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion, these stops are recorded and the data made publicly available on an annual basis.We use this data from 2023 which can be found in the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page). The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
-
+For over 20 years, civilians in New York City (NYC) may be stopped, question, and searched by the police based solely on suspicion. These stops are recorded and the data made publicly available on an annual basis. We use the [NYPD Stop, Question and Frisk Data](https://www.nyc.gov/site/nypd/stats/reports-analysis/stopfrisk.page) for 2023. The data is collected from the 77 NYPD police precincts which span New York City’s 5 boroughs. This is a stop-level dataset; each observation (row) corresponds to a unique stop made by an NYPD police officer in 2023 as part of the SQF programme. Whenever a stop occurs under the stop-and-frisk programme, officers are required to record and classify it and, therefore, all such stops that occurred during the 2023 calendar year correspond to an observation in the dataset. 
 
 * **Target variable:** Our goal is to predict `arrested_flag`, which is a binary indicator that equals 1 if the individual who was stopped was arrested, and 0 otherwise.^[In the raw data, the flag's entries are actually `"Y"` and `"N"`, but we clean this.]
 
@@ -28,10 +27,10 @@ For over 20 years, civilians in New York City (NYC) may be stopped, question, an
 The stop-and-frisk program has been highly criticized as it does not require evidence to stop individuals and may allow police to use racial profiling tactics to target individuals. The American Civil Liberties Union of New York found that the program disproportionately stops civilians of colour, in particular Black civilians, with some stops resulting in police misconduct. As the stops do not require prior evidence or warrants, we are interested in predicting which stops result in arrest. We particularly focus on factors gathered before the stop begins that may predict arrest, such as demographic characteristics of civilians, location, time of day, and attributes of the police officers. This sheds light on which factors are most important in predicting arrests, and whether race is an important factor once a suspect has been stopped.
 
 * **Relevant Features and Methods:**
-The dataset contains 82 columns, including identifying features, location features, timestamps, continuous features and dummy variables. We keep as many features as relevant, however, we drop certain features such as identifying features, features with a high proportion of NAs, and any “excess” features that become irrelevant after feature engineering and extraction. We then reclassify categorical features into dummy variables. This yields a dataset of 155 features in our full model and 125 in our subset model, which only considers features measurable before the stop. We explore comparisons between a logit regression model, shrinkage estimators, and a random forest. In particular, we exploit the ability of shrinkage estimators and random forests to deal with sparse models. We also run models on test and validation subsets before comparing them across similar test models when comparing the predictive abilities to avoid overfitting.
+The dataset contains 82 columns, including identifying features, location features, timestamps, continuous features and dummy variables. We keep as many features as relevant, however, we drop certain features such as identifying features, features with a high proportion of NAs, and any “excess” features that become irrelevant after feature engineering and extraction. We then reclassify categorical features into dummy variables. This yields a dataset of 155 features in our full model and 125 in our subset model, which only considers features measurable before the stop. We explore comparisons between a logit regression model, shrinkage estimators, and a random forest. In particular, we exploit the ability of shrinkage estimators and random forests to deal with sparse models. We also run models on test and validation subsets before comparing them across similar test models when comparing the predictive abilities.
 
 * **Preliminary Results:**
-Whilst we find that the logit model does a decent job of prediction, it is improved on by shrinkage estimators. Of the shrinkage estimators, the elastic net estimator performs best. In turn the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that racial and wealth based factors are the most important in predicting arrests.
+Whilst we find that the logit model has reasonably good predictive performance in the test data, it is improved on by shrinkage estimators. Of the shrinkage estimators, the lasso estimator performs best. In turn, the random forest estimator performs even better. This suggests that our data exhibits mild sparsity and non-linearities, hence why all the models perform fairly well but the random forest performs best. The random forest suggests that racial and wealth based factors are the most important in predicting arrests.
 
 # Data Description
 
@@ -813,17 +812,17 @@ ggplot(nyc_tract_shp) +
 ggplot(nyc_tract_shp) +
   geom_sf(aes(fill = pc_pop_asian_est)) +
   scale_fill_viridis_c(
-    name = "Non-hispanic Asian % Total Population",
+    name = "Non-Hispanic Asian % Total Population",
     option = "inferno"
   ) +
   theme_void() +
-  labs(title = "Non-hispanic Asian Population by Census Tract, ACS 2013-2017")
+  labs(title = "Non-Hispanic Asian Population by Census Tract, ACS 2013-2017")
 
 # pop age 25 years or older with at least bachelors degree
 ggplot(nyc_tract_shp) +
   geom_sf(aes(fill = pc_pop_ba_above_est)) +
   scale_fill_viridis_c(
-    name = "% Population Aged >= 25 with at Least Bachelors Degree",
+    name = "% Population Aged >= 25 with at Least Bachelor's Degree",
     option = "inferno"
   ) +
   theme_void() +
@@ -1234,7 +1233,7 @@ cat("AUC for the Ridge (subset) model:", ridge_auc_subset, "\n")
 
 We find an optimal lambda of 0.0126 to 3 significant figures, which is much higher than the previous shrinkage regressions and suggests that this requires more aggressive shrinkage.
 
-The confusion matrix for our ridge subset indicates a specificity of 77% and a sensitivity of 66%, with an AUC of 0.775 to 3 significant figures. Whilst the specificity and sensitivity rates are the same as in LASSO, this could be because of our specified C=1, since the AUC is lower than the LASSO regression. This suggests that LASSO's property of shrinking sparse estimators to 0, rather than towards 0, like ridge is more effective.
+The confusion matrix for our ridge subset indicates a specificity of 77% and a sensitivity of 66%, with an AUC of 0.775 to 3 significant figures. Whilst the specificity and sensitivity rates are the same as in LASSO, this could be because of our specified C=1, since the AUC is lower than the LASSO regression. This suggests that LASSO's property of shrinking sparse estimators to 0, rather than towards 0 (as done in ridge) is more effective.
 
 However, the differences between models are still very modest so this suggests that they have similar predictive capabilities.
 
@@ -1624,4 +1623,4 @@ Our initial exploration of the dataset's descriptive statistics and the random f
 
 A potential extension to this model would be to attempt to fit the "full" regression model to both the random forest and the tuned elastic net. This would be viable with more computing power, and it would be a useful extension to see whether the random forest was robust to adding new variables. We could also attempt to fit the models on previous years stop-and-frisk data to see if their out-of-sample goodness of fit extended to other years' data.
 
-Despite, having a large dataset of over 10000 observations, even after our dataset undergoes significant cleaning and feature engineering, our dataset still exhibits a high degree of granularity due to the large number of predictors. Therefore, it is unsurprising that some of these predictors exhibit little to no variation. We can see this in the chart showing the percentage of "nulls" in each feature, since many of these "nulls" are actually zeros.This lack of variation is also clear in some of the spacial features, as we can see that not all localities in the map have an arrest percentage to report in our exploratory analysis. Whilst, we drop multicollinear variables for our logit model, and shrinkage estimators and the random forest are designed to be more robust to a lack of variation in features, there could still be some issues with overfitting due to the sheer number of features with limited variation.
+Despite having a large dataset of over 10,000 observations, even after our dataset undergoes significant cleaning and feature engineering, our dataset still exhibits a high degree of granularity due to the large number of predictors. Therefore, it is unsurprising that some of these predictors exhibit little to no variation. We can see this in the chart showing the percentage of "nulls" in each feature, since many of these "nulls" are actually zeros. This lack of variation is also clear in some of the spatial features, as we can see that not all localities in the map have an arrest percentage to report in our exploratory analysis. Whilst, we drop multicollinear variables for our logit model, and shrinkage estimators and the random forest are designed to be more robust to a lack of variation in features, there could still be some issues with overfitting due to the sheer number of features with limited variation.
