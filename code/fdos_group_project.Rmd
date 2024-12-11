@@ -1528,7 +1528,7 @@ auc_table <- auc_table %>%
 print(auc_table)
 ```
 
-As discussed before, we see how the two full shrinkage regressions perform exceptionally well out of sample, however, this is likely be due to potential results engineering due to some variables being potentially taking place after an arrest. The other ROC curves seem to otherwise be very similar, however, the ROC curve for the random forest estimation clearly stands out as having a better out of sample fit, compared to its peers.
+As discussed before, we see how the two full shrinkage regressions perform exceptionally well out of sample, however, this is likely due to potential results engineering due to some variables potentially taking place after an arrest. The other ROC curves seem to otherwise be very similar, however, the ROC curve for the random forest estimation clearly stands out as having a better out of sample fit, compared to its peers.
 
 ## Variable Importance
 
@@ -1586,6 +1586,7 @@ en_subset_coeff <- en_subset_coeff[-1]
 en_plot <- compute_variable_importance(en_subset_coeff, "Elastic Net Subset") 
 print(en_plot)
 ```
+
 We see that the logistic curve classifies dummies indicating the rank of the officer conducting the stop as the most important variables in predicting arrest, with certain suspected crimes also being highly predictive. The latter makes sense, as for it is easy to understand why on certain crimes like terrorism, the police would err on the side of caution and arrest a stopped subject. It is also easy to understand why certain very specific crimes, like criminal posession of a forged instrument, might only lead to stops when the threshhold for arrest has already been surpassed.
 
 On the side of the shrinkage estimators a couple key factors show up in each of the three types of predictors. The `officer_explained_stop_flag` is a very important predictor and it suggests that an officer explaining why a suspect has been stopped means there is good evidence for the suspect to be arrested and the officer is following protocol to avoid potential legal complications. We also see certain crime and officer rank dummies featuring highly. Their presence would be explained by the same explanation as with the logit estimator.
